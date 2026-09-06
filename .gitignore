@@ -1,0 +1,28 @@
+﻿# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller / Packaging
+build/
+dist/
+*.spec
+*.zip
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# IDE / Editor files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+
+# OS generated
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
