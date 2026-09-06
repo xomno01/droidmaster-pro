@@ -12,8 +12,8 @@ Chúng tôi cam kết phát hành các bản vá bảo mật và cập nhật k�
 
 | Phiên bản | Trạng thái hỗ trợ | Ghi chú |
 | :--- | :--- | :--- |
-| **v2.6.x (Enterprise Refactor)** | ✅ Đang hỗ trợ chính thức | Phiên bản kiến trúc Zero-Eval, Centralized ADB Core |
-| < v2.6.0 | ❌ Ngừng hỗ trợ | Khuyến nghị nâng cấp lên v2.6.0+ |
+| **v2.7.x (Production-Grade Hardening)** | ✅ Đang hỗ trợ chính thức | Phiên bản kiến trúc Zero-Eval, Centralized ADB Core, Production-Grade Hardening |
+| < v2.7.0 | ❌ Ngừng hỗ trợ | Khuyến nghị nâng cấp lên v2.7.0+ |
 
 ### Quy Trình Báo Cáo Lỗ Hổng (Reporting a Vulnerability)
 

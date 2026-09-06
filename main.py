@@ -96,7 +96,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.6.0")
+        lbl_ver = QLabel("v2.7.0")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -440,7 +440,7 @@ class DroidMasterApp(QMainWindow):
         root_layout.addWidget(main_content, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.6.0 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.7.0 sẵn sàng.")
 
     # =================================================================
     # CONTROLLER ACTIONS & LOGIC
