@@ -44,6 +44,43 @@ class AsyncWorker(QThread):
         except Exception as e:
             self.finished.emit(False, str(e))
 
+class PhantomBotWorker(QThread):
+    sig_log = Signal(str)
+    sig_finished = Signal(bool)
+
+    def __init__(self, target_serial: str, log_callback=None):
+        super().__init__()
+        self.target_serial = target_serial
+        self._is_cancelled = False
+        self.runner = None
+        if log_callback:
+            self.sig_log.connect(log_callback)
+
+    def is_cancelled(self) -> bool:
+        return self._is_cancelled
+
+    def cancel(self):
+        self._is_cancelled = True
+        if self.runner:
+            try:
+                self.runner.cancel()
+            except Exception:
+                pass
+
+    def run(self):
+        try:
+            import phantom_agent
+            self.runner = phantom_agent.PhantomBotRunner()
+            success = self.runner.run_workflow(
+                serial=self.target_serial,
+                log_callback=self.sig_log.emit,
+                is_cancelled=self.is_cancelled
+            )
+            self.sig_finished.emit(bool(success))
+        except Exception as e:
+            self.sig_log.emit(f"❌ Lỗi thực thi Bot: {e}")
+            self.sig_finished.emit(False)
+
 class DroidMasterApp(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -52,11 +89,13 @@ class DroidMasterApp(QMainWindow):
         if os.path.exists(icon_file):
             self.setWindowIcon(QIcon(icon_file))
         self.resize(1020, 740)
-        self.setMinimumSize(920, 660)
+        self.setMinimumSize(780, 480)
         self.setStyleSheet(DARK_THEME_QSS)
 
         self.active_serial = None
         self.scrcpy_proc = None
+        self.bot_worker = None
+        self.btn_bot = None
         self.devices = []
         self.workers = []
         self.is_fetching_telemetry = False
@@ -83,12 +122,22 @@ class DroidMasterApp(QMainWindow):
         # =============================================================
         # LEFT COLUMN: SIDEBAR (DEVICE CARD & REMOTE CONTROLS)
         # =============================================================
+        sidebar_scroll = QScrollArea()
+        sidebar_scroll.setObjectName("sidebarScroll")
+        sidebar_scroll.setWidgetResizable(True)
+        sidebar_scroll.setFrameShape(QFrame.NoFrame)
+        sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        sidebar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        sidebar_scroll.setMinimumWidth(260)
+        sidebar_scroll.setMaximumWidth(340)
+
         sidebar = QFrame()
         sidebar.setObjectName("sidebarFrame")
-        sidebar.setFixedWidth(320)
+        sidebar.setMinimumWidth(260)
+        sidebar.setMaximumWidth(340)
         side_layout = QVBoxLayout(sidebar)
-        side_layout.setContentsMargins(20, 24, 20, 24)
-        side_layout.setSpacing(18)
+        side_layout.setContentsMargins(18, 20, 18, 20)
+        side_layout.setSpacing(16)
 
         # 1. App Branding
         brand_row = QHBoxLayout()
@@ -96,7 +145,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.7.0")
+        lbl_ver = QLabel("v2.8.0")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -160,17 +209,22 @@ class DroidMasterApp(QMainWindow):
         self.val_ip.setObjectName("metricValue")
         self.val_res = QLabel("--")
         self.val_res.setObjectName("metricValue")
+        self.val_cpu = QLabel("--")
+        self.val_cpu.setObjectName("metricValue")
 
-        def add_spec(r, c, title, widget):
+        def add_spec(r, c, title, widget, col_span=None):
             lbl = QLabel(title)
             lbl.setObjectName("metricLabel")
-            grid_specs.addWidget(lbl, r, c)
-            grid_specs.addWidget(widget, r + 1, c)
+            widget.setWordWrap(True)
+            span = col_span if col_span is not None else (2 if (c == 0 and r >= 4) else 1)
+            grid_specs.addWidget(lbl, r, c, 1, span)
+            grid_specs.addWidget(widget, r + 1, c, 1, span)
 
         add_spec(0, 0, "Pin & Nhiệt Độ", self.val_battery)
         add_spec(0, 1, "Hệ Điều Hành", self.val_os)
         add_spec(2, 0, "Địa Chỉ Wi-Fi", self.val_ip)
         add_spec(2, 1, "Màn Hình", self.val_res)
+        add_spec(4, 0, "CPU & Tải Máy", self.val_cpu)
 
         card_dev_layout.addLayout(grid_specs)
         side_layout.addWidget(self.card_device)
@@ -236,7 +290,8 @@ class DroidMasterApp(QMainWindow):
         lbl_hint.setWordWrap(True)
         side_layout.addWidget(lbl_hint)
 
-        root_layout.addWidget(sidebar)
+        sidebar_scroll.setWidget(sidebar)
+        root_layout.addWidget(sidebar_scroll)
 
         # =============================================================
         # RIGHT COLUMN: MAIN CANVAS (HERO STREAM + BENTO TILES)
@@ -262,7 +317,7 @@ class DroidMasterApp(QMainWindow):
 
         lbl_hero_head = QLabel("🖥️ Chiếu Màn Hình Thời Gian Thực (Scrcpy Pro)")
         lbl_hero_head.setStyleSheet("font-size: 17px; font-weight: 800; color: #f8fafc;")
-        lbl_hero_sub = QLabel("Chuẩn 60 FPS • Độ trễ 0ms • GPU giải mã phần cứng siêu nhẹ (< 1% CPU)")
+        lbl_hero_sub = QLabel("Chuẩn 60 FPS • Độ trễ thấp 35-70ms • GPU giải mã phần cứng siêu nhẹ (< 1% CPU)")
         lbl_hero_sub.setStyleSheet("font-size: 12px; color: #94a3b8;")
 
         hero_title_box.addWidget(lbl_hero_head)
@@ -319,6 +374,7 @@ class DroidMasterApp(QMainWindow):
         def create_bento_tile(icon, title, desc, btn_text, callback, accent_color="#38bdf8"):
             tile = QFrame()
             tile.setProperty("class", "bentoCard")
+            tile.setMinimumHeight(130)
             t_layout = QVBoxLayout(tile)
             t_layout.setContentsMargins(18, 16, 18, 16)
             t_layout.setSpacing(8)
@@ -328,6 +384,7 @@ class DroidMasterApp(QMainWindow):
             icon_lbl.setStyleSheet(f"font-size: 22px; color: {accent_color};")
             t_title = QLabel(title)
             t_title.setObjectName("cardTitle")
+            t_title.setWordWrap(True)
             head_h.addWidget(icon_lbl)
             head_h.addWidget(t_title)
             head_h.addStretch()
@@ -337,6 +394,7 @@ class DroidMasterApp(QMainWindow):
             t_desc.setWordWrap(True)
 
             action_btn = QPushButton(btn_text)
+            action_btn.setMinimumHeight(38)
             action_btn.setCursor(QCursor(Qt.PointingHandCursor))
             action_btn.clicked.connect(callback)
 
@@ -344,27 +402,27 @@ class DroidMasterApp(QMainWindow):
             t_layout.addWidget(t_desc)
             t_layout.addSpacing(4)
             t_layout.addWidget(action_btn)
-            return tile
+            return tile, action_btn
 
-        tile_snap = create_bento_tile(
+        tile_snap, _ = create_bento_tile(
             "📸", "Chụp Màn Hình",
             "Chụp và lưu ảnh HD thẳng vào Pictures/DroidMaster trên PC.",
             "Chụp ảnh ngay", self.action_take_screenshot, "#38bdf8"
         )
 
-        tile_apk = create_bento_tile(
+        tile_apk, _ = create_bento_tile(
             "📦", "Cài Đặt APK",
             "Chọn file .apk bất kỳ trên máy tính để cài đặt tự động vào máy.",
             "Chọn file APK...", self.action_install_apk, "#10b981"
         )
 
-        tile_wifi = create_bento_tile(
+        tile_wifi, _ = create_bento_tile(
             "📶", "Không Dây Wi-Fi",
             "Kích hoạt kết nối qua Wi-Fi (cổng 5555) để rút dây cáp USB.",
             "Bật kết nối Wi-Fi", self.action_connect_wifi, "#f59e0b"
         )
 
-        tile_bot = create_bento_tile(
+        tile_bot, self.btn_bot = create_bento_tile(
             "🤖", "Bot Phantom Scroll",
             "Tự động mở Facebook, tin tức Tinhte và Nekogram lướt trong 60s.",
             "Kích hoạt Bot (60s)", self.action_run_bot, "#8b5cf6"
@@ -437,7 +495,14 @@ class DroidMasterApp(QMainWindow):
         term_layout.addWidget(self.txt_log)
         content_layout.addWidget(term_frame)
 
-        root_layout.addWidget(main_content, 1)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        scroll.setWidget(main_content)
+
+        root_layout.addWidget(scroll, 1)
 
         self.setCentralWidget(central)
         self.log("🚀 DroidMaster Pro v2.7.0 sẵn sàng.")
@@ -524,6 +589,8 @@ class DroidMasterApp(QMainWindow):
         self.val_os.setText(str(info.get("android_version", "--")))
         self.val_ip.setText(str(info.get("ip", "--")))
         self.val_res.setText(str(info.get("resolution", "--")))
+        cpu_val = info.get("cpu", info.get("cpu_load", "--"))
+        self.val_cpu.setText(str(cpu_val))
 
     def auto_poll_telemetry(self):
         if self.active_serial and not self.is_fetching_telemetry:
@@ -534,6 +601,7 @@ class DroidMasterApp(QMainWindow):
         self.val_os.setText("--")
         self.val_ip.setText("--")
         self.val_res.setText("--")
+        self.val_cpu.setText("--")
 
     def action_toggle_stream(self):
         if not self.active_serial:
@@ -687,24 +755,81 @@ class DroidMasterApp(QMainWindow):
         self.run_async(task, on_done)
 
     def action_run_bot(self):
-        macro_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "phantom_agent.py")
-        if not os.path.exists(macro_path):
-            macro_path = os.path.join(os.getcwd(), "phantom_agent.py")
-        if os.path.exists(macro_path):
-            py_exec = sys.executable
-            if getattr(sys, 'frozen', False):
-                import shutil
-                py_exec = shutil.which("python") or "python"
-            args = [py_exec, macro_path]
-            if self.active_serial:
-                args.append(self.active_serial)
-            flags = subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0
-            subprocess.Popen(args, creationflags=flags)
-            self.log("🤖 Đã kích hoạt Bot Phantom Scroll (mở cửa sổ giám sát riêng).")
+        # Emergency stop toggle
+        if self.bot_worker is not None and self.bot_worker.isRunning():
+            self.log("⚠️ Yêu cầu DỪNG KHẨN CẤP Bot Phantom Scroll...")
+            if hasattr(self, 'btn_bot') and self.btn_bot:
+                self.btn_bot.setEnabled(False)
+                self.btn_bot.setText("Đang dừng...")
+            self.bot_worker.cancel()
+            return
+
+        if not self.active_serial:
+            QMessageBox.warning(self, "Chú ý", "Vui lòng kết nối một điện thoại Android trước khi chạy Bot!")
+            return
+
+        if hasattr(self, 'btn_bot') and self.btn_bot:
+            self.btn_bot.setText("⏹ DỪNG BOT KHẨN CẤP")
+            self.btn_bot.setStyleSheet(
+                "background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ef4444, stop:1 #dc2626); "
+                "color: #ffffff; font-weight: bold; border: 1px solid #f87171;"
+            )
+
+        self.bot_worker = PhantomBotWorker(self.active_serial, log_callback=self.log)
+        self.bot_worker.sig_finished.connect(self.on_bot_finished)
+        self.bot_worker.start()
+        self.log(f"🤖 Đã kích hoạt Bot Phantom Scroll (60s) trên thiết bị [{self.active_serial}].")
+
+    def on_bot_finished(self, success: bool):
+        if hasattr(self, 'btn_bot') and self.btn_bot:
+            self.btn_bot.setEnabled(True)
+            self.btn_bot.setText("Kích hoạt Bot (60s)")
+            self.btn_bot.setStyleSheet("")
+        if success:
+            self.log("🤖 Bot Phantom Scroll đã hoàn thành chu trình 60s thành công.")
         else:
-            QMessageBox.warning(self, "Lỗi", "Không tìm thấy phantom_agent.py!")
+            self.log("⏹️ Bot Phantom Scroll đã dừng hoặc kết thúc.")
+        self.bot_worker = None
 
     def closeEvent(self, event):
+        # 1. Cancel and terminate bot worker
+        if self.bot_worker is not None and self.bot_worker.isRunning():
+            try:
+                self.bot_worker.cancel()
+                self.bot_worker.quit()
+                if not self.bot_worker.wait(1000):
+                    self.bot_worker.terminate()
+                    self.bot_worker.wait(500)
+            except Exception:
+                pass
+            self.bot_worker = None
+
+        # 2. Terminate / kill scrcpy process
+        if self.scrcpy_proc is not None:
+            try:
+                if self.scrcpy_proc.poll() is None:
+                    self.scrcpy_proc.terminate()
+                    try:
+                        self.scrcpy_proc.wait(timeout=1.0)
+                    except subprocess.TimeoutExpired:
+                        self.scrcpy_proc.kill()
+            except Exception:
+                pass
+            self.scrcpy_proc = None
+
+        # 3. Stop all QTimers
+        try:
+            if hasattr(self, 'timer') and self.timer.isActive():
+                self.timer.stop()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'scrcpy_monitor_timer') and self.scrcpy_monitor_timer.isActive():
+                self.scrcpy_monitor_timer.stop()
+        except Exception:
+            pass
+
+        # 4. Cleanup background workers
         for worker in list(self.workers):
             try:
                 if worker.isRunning():
@@ -713,8 +838,7 @@ class DroidMasterApp(QMainWindow):
             except Exception:
                 pass
         self.workers.clear()
-        if self.scrcpy_proc and self.scrcpy_proc.poll() is None:
-            self.scrcpy_proc.terminate()
+
         event.accept()
 
 if __name__ == "__main__":

@@ -12,8 +12,9 @@ Chúng tôi cam kết phát hành các bản vá bảo mật và cập nhật k�
 
 | Phiên bản | Trạng thái hỗ trợ | Ghi chú |
 | :--- | :--- | :--- |
-| **v2.7.x (Production-Grade Hardening)** | ✅ Đang hỗ trợ chính thức | Phiên bản kiến trúc Zero-Eval, Centralized ADB Core, Production-Grade Hardening |
-| < v2.7.0 | ❌ Ngừng hỗ trợ | Khuyến nghị nâng cấp lên v2.7.0+ |
+| **v2.8.x (Production-Grade & Responsive UI)** | ✅ Đang hỗ trợ chính thức | Phiên bản kiến trúc Zero-Eval, Responsive Bento Layout, Real CPU Telemetry, In-Memory Streaming |
+| **v2.7.x (Production-Grade Hardening)** | ⚠️ Hỗ trợ bảo trì | Tiếp nhận bản vá an ninh quan trọng |
+| < v2.7.0 | ❌ Ngừng hỗ trợ | Khuyến nghị nâng cấp lên v2.8.0+ |
 
 ### Quy Trình Báo Cáo Lỗ Hổng (Reporting a Vulnerability)
 
@@ -102,10 +103,12 @@ Kiến trúc bảo mật của DroidMaster Pro được thiết kế xoay quanh 
 
 DroidMaster Pro tích hợp sẵn bộ binary Scrcpy v4.1 và Android SDK Platform-Tools portable trong thư mục `bin/` để đảm bảo phần mềm có thể chạy ngay (out-of-the-box) mà người dùng không cần cài đặt thêm phần mềm rườm rà.
 
-### Nguồn Gốc Binary
+### Nguồn Gốc Binary & Giấy Phép Bản Quyền
 
-* **ADB (`adb.exe`, `AdbWinApi.dll`, `AdbWinUsbApi.dll`):** Trích xuất từ gói chính thức **Google Android SDK Platform-Tools** cho Windows.
-* **Scrcpy Suite (`scrcpy.exe`, `scrcpy-server`, `SDL3.dll`, FFmpeg DLLs):** Trích xuất từ bản phát hành chính thức **Genymobile Scrcpy v4.1**.
+* **ADB (`adb.exe`, `AdbWinApi.dll`, `AdbWinUsbApi.dll`):** Trích xuất từ gói chính thức **Google Android SDK Platform-Tools** cho Windows (Apache-2.0).
+* **Scrcpy Suite (`scrcpy.exe`, `scrcpy-server`, `SDL3.dll`, FFmpeg DLLs):** Trích xuất từ bản phát hành chính thức **Genymobile Scrcpy v4.1** (Apache-2.0, zlib, LGPL-2.1+).
+* Toàn bộ nguồn gốc, phiên bản và thông cáo bản quyền bên thứ ba được ghi chép chi tiết tại [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+* Siêu dữ liệu đối soát máy đọc được cung cấp tại [`bin/manifest.json`](bin/manifest.json).
 
 ### Bảng Mã Băm SHA-256 Chuẩn (Baseline Checksums)
 

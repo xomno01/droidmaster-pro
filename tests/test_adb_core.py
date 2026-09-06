@@ -35,6 +35,12 @@ from adb_core import (
     escape_unicode_text,
     send_text,
     parse_ui_hierarchy,
+    take_screenshot,
+    take_screenshot_bytes,
+    connect_wifi,
+    switch_to_wifi,
+    load_binary_manifest,
+    verify_binary_manifest,
     DeviceOfflineError,
     ADBTimeoutError,
     ADBError,
@@ -276,6 +282,209 @@ class TestADBCore(unittest.TestCase):
         self.assertEqual(elem3["short_id"], "title")
         # Center = ((200 + 900) // 2, (400 + 480) // 2) = (550, 440)
         self.assertEqual(elem3["center"], (550, 440))
+
+    def test_telemetry_cpu_parsing(self):
+        """Mock output containing ===CPU=== TOTAL: 14.5%... and verify
+        that info['cpu'] is correctly parsed.
+        """
+        # Case 1: Standard dumpsys cpuinfo format with TOTAL: 14.5%
+        mock_cpu_stdout = (
+            "===BATTERY===\nlevel: 80\n"
+            "===IP===\n192.168.1.50\n"
+            "===WIN===\nmCurrentFocus=Window{123 u0 com.android.settings}\n"
+            "===CPU===\n"
+            "Load: 2.1 / 1.8 / 1.2\n"
+            "TOTAL: 14.5% (user 9.2% + kernel 5.3% + iowait 0% + softirq 0%)\n"
+        )
+        with patch("adb_core.run_adb_raw", return_value=(0, mock_cpu_stdout, "")):
+            info = get_device_info("test_serial_cpu", dynamic_only=True)
+        self.assertEqual(info["cpu"], "14.5%")
+
+        # Case 2: Alternate format "14.5% TOTAL"
+        mock_alt_cpu = (
+            "===CPU===\n"
+            "14.5% TOTAL: 10% user + 4.5% kernel\n"
+        )
+        with patch("adb_core.run_adb_raw", return_value=(0, mock_alt_cpu, "")):
+            info_alt = get_device_info("test_serial_cpu_alt", dynamic_only=True)
+        self.assertEqual(info_alt["cpu"], "14.5%")
+
+        # Case 3: Empty CPU output defaults gracefully
+        with patch("adb_core.run_adb_raw", return_value=(0, "===BATTERY===\nlevel: 80\n", "")):
+            info_empty = get_device_info("test_serial_cpu_empty", dynamic_only=True)
+        self.assertEqual(info_empty["cpu"], "--%")
+
+        # Case 4: Prompt format '12% TOTAL'
+        mock_prompt_cpu = (
+            "===CPU===\n"
+            "12% TOTAL\n"
+        )
+        with patch("adb_core.run_adb_raw", return_value=(0, mock_prompt_cpu, "")):
+            info_p = get_device_info("test_serial_prompt_cpu", dynamic_only=True)
+        self.assertEqual(info_p["cpu"], "12%")
+
+    def test_take_screenshot_bytes(self):
+        """Mock exec-out screencap returning bytes b'\\x89PNG\\r\\n\\x1a\\n...' and
+        verify that take_screenshot_bytes returns the valid bytes.
+        """
+        mock_png_bytes = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x04\x38\x00\x00\x07\x80'
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = mock_png_bytes
+
+        with patch("subprocess.run", return_value=mock_proc) as mock_run:
+            raw_bytes = take_screenshot_bytes("mock_serial")
+            self.assertIsNotNone(raw_bytes)
+            self.assertTrue(raw_bytes.startswith(b'\x89PNG\r\n\x1a\n'))
+            self.assertEqual(raw_bytes, mock_png_bytes)
+            mock_run.assert_called_once()
+            args = mock_run.call_args[0][0]
+            self.assertIn("exec-out", args)
+            self.assertIn("screencap", args)
+            self.assertIn("-p", args)
+
+        # Test failure case: returncode != 0
+        mock_proc_fail = MagicMock()
+        mock_proc_fail.returncode = 1
+        mock_proc_fail.stdout = b'Error capturing screen'
+        with patch("subprocess.run", return_value=mock_proc_fail):
+            res = take_screenshot_bytes("mock_serial")
+            self.assertIn(res, (None, b""))
+
+        # Test failure case: corrupted / non-PNG output
+        mock_proc_corrupt = MagicMock()
+        mock_proc_corrupt.returncode = 0
+        mock_proc_corrupt.stdout = b'Corrupted bytes'
+        with patch("subprocess.run", return_value=mock_proc_corrupt):
+            res = take_screenshot_bytes("mock_serial")
+            self.assertIn(res, (None, b""))
+
+    def test_binary_manifest_validation(self):
+        """Read bin/manifest.json (if present) and verify json structure contains
+        adb.exe, scrcpy.exe, scrcpy-server and 64-character SHA-256 hashes.
+        """
+        bin_dir = adb_core.BIN_DIR or os.path.join(PROJECT_DIR, "bin")
+        manifest_file = os.path.join(bin_dir, "manifest.json")
+
+        manifest = load_binary_manifest(manifest_file)
+        self.assertTrue(bool(manifest), f"Manifest file should exist at {manifest_file} and not be empty")
+
+        # Extract file map (supports 'files' key, 'binaries' key, or root dict)
+        file_entries = manifest.get("files") or manifest.get("binaries") or manifest
+
+        required_binaries = ["adb.exe", "scrcpy.exe", "scrcpy-server"]
+        hex_chars = set("0123456789abcdefABCDEF")
+
+        for bin_name in required_binaries:
+            self.assertIn(bin_name, file_entries, f"Manifest must contain entry for {bin_name}")
+            entry = file_entries[bin_name]
+            sha = entry["sha256"] if isinstance(entry, dict) else entry
+            self.assertIsInstance(sha, str)
+            self.assertEqual(len(sha), 64, f"SHA-256 for {bin_name} must be exactly 64 hex characters")
+            self.assertTrue(all(c in hex_chars for c in sha), f"SHA-256 for {bin_name} contains invalid hex characters")
+
+        # Verify against actual files if present
+        import hashlib
+        for bin_name in required_binaries:
+            bin_path = os.path.join(bin_dir, bin_name)
+            if os.path.isfile(bin_path):
+                hasher = hashlib.sha256()
+                with open(bin_path, "rb") as f:
+                    while chunk := f.read(65536):
+                        hasher.update(chunk)
+                computed_sha = hasher.hexdigest().lower()
+                entry = file_entries[bin_name]
+                expected_sha = (entry["sha256"] if isinstance(entry, dict) else entry).lower()
+                self.assertEqual(computed_sha, expected_sha, f"Physical binary {bin_name} SHA-256 mismatch")
+
+    def test_wifi_tcpip_failure(self):
+        """Mock when tcpip command returns exit code != 0.
+        Verify connect_wifi returns controlled failure (ok=False) or raises exception when check=True.
+        """
+        # Case 1: Controlled failure (ok=False, message string)
+        with patch("adb_core.run_adb_raw", return_value=(1, "", "error: closed")):
+            ok, msg = connect_wifi("mock_device", "192.168.1.100", 5555)
+            self.assertFalse(ok)
+            self.assertIn("error: closed", msg)
+
+        # Case 2: Controlled failure when adb device is unauthorized/offline
+        with patch("adb_core.run_adb_raw", return_value=(1, "", "error: device unauthorized")):
+            ok, msg = connect_wifi("mock_device", "192.168.1.100", 5555)
+            self.assertFalse(ok)
+            self.assertIn("device unauthorized", msg)
+
+        # Case 3: When check=True, raises ADBError
+        with patch("adb_core.run_adb_raw", return_value=(1, "", "error: tcpip failed")):
+            with self.assertRaises(ADBError) as ctx:
+                connect_wifi("mock_device", "192.168.1.100", 5555, check=True)
+            self.assertEqual(ctx.exception.returncode, 1)
+
+    def test_take_screenshot_with_output_path(self):
+        """Verify take_screenshot saves bytes to output_path and returns raw bytes."""
+        import tempfile
+        mock_png_bytes = b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR'
+        with patch("adb_core.take_screenshot_bytes", return_value=mock_png_bytes):
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                out_file = os.path.join(tmp_dir, "test_snap.png")
+                ret_bytes = take_screenshot("mock_serial", out_file)
+                self.assertEqual(ret_bytes, mock_png_bytes)
+                self.assertTrue(os.path.isfile(out_file))
+                with open(out_file, "rb") as f:
+                    self.assertEqual(f.read(), mock_png_bytes)
+
+    def test_connect_wifi_success(self):
+        """Test successful connect_wifi execution with return code and stdout checks."""
+        with patch("adb_core.run_adb_raw") as mock_run:
+            mock_run.side_effect = [
+                (0, "restarting in TCP mode port: 5555", ""),
+                (0, "connected to 192.168.1.100:5555", ""),
+            ]
+            ok, msg = connect_wifi("mock_device", "192.168.1.100", 5555)
+            self.assertTrue(ok)
+            self.assertIn("192.168.1.100:5555", msg)
+
+    def test_connect_wifi_auto_ip(self):
+        """Test connect_wifi with auto-discovered IP from get_device_info."""
+        with patch("adb_core.run_adb_raw") as mock_run, \
+             patch("adb_core.get_device_info", return_value={"ip": "10.0.0.5"}):
+            mock_run.side_effect = [
+                (0, "restarting in TCP mode port: 5555", ""),
+                (0, "connected to 10.0.0.5:5555", ""),
+            ]
+            ok, msg = connect_wifi("mock_device", port=5555)
+            self.assertTrue(ok)
+            self.assertIn("10.0.0.5:5555", msg)
+
+    def test_verify_binary_manifest_real_and_mock(self):
+        """Test verify_binary_manifest on actual bin/manifest.json and edge cases."""
+        import tempfile
+        import json
+
+        # 1. Real manifest check
+        res = verify_binary_manifest()
+        self.assertTrue(res["manifest_found"])
+        self.assertTrue(res["valid"])
+        self.assertGreater(res["checked_count"], 0)
+        self.assertEqual(len(res["errors"]), 0)
+
+        # 2. Missing manifest check
+        res_missing = verify_binary_manifest("/non/existent/manifest.json")
+        self.assertFalse(res_missing["manifest_found"])
+        self.assertFalse(res_missing["valid"])
+
+        # 3. Hash mismatch check
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            dummy_file = os.path.join(tmp_dir, "fake.bin")
+            with open(dummy_file, "wb") as f:
+                f.write(b"content")
+            manifest_file = os.path.join(tmp_dir, "manifest.json")
+            with open(manifest_file, "w") as f:
+                json.dump({"files": {"fake.bin": "0" * 64}}, f)
+
+            res_mismatch = verify_binary_manifest(manifest_file)
+            self.assertTrue(res_mismatch["manifest_found"])
+            self.assertFalse(res_mismatch["valid"])
+            self.assertEqual(res_mismatch["files"]["fake.bin"]["status"], "mismatch")
 
 
 class TestCyberDroid(unittest.TestCase):

@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 DroidMaster Ultra-Modern UI Theme (2026 Design System)
 Inspired by Linear, Raycast, and macOS Fluent design.
@@ -45,9 +45,17 @@ QFrame.bentoCard:hover {
 }
 
 /* Sidebar Container */
-QFrame#sidebarFrame {
+QScrollArea#sidebarScroll {
     background-color: #0e1420;
     border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+QScrollArea#sidebarScroll > QWidget > QWidget {
+    background-color: #0e1420;
+}
+
+QFrame#sidebarFrame {
+    background-color: #0e1420;
+    border: none;
 }
 
 /* Hero Mirror Card */
@@ -84,7 +92,7 @@ QLabel#cardDesc {
 }
 
 QLabel#metricValue {
-    font-size: 16px;
+    font-size: 13.5px;
     font-weight: 700;
     color: #f1f5f9;
 }

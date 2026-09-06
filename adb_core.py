@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 import threading
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any, Union
 
 
 # ==============================================================================
@@ -316,6 +316,7 @@ def get_device_info(serial: str, dynamic_only: bool = False, refresh_cache: bool
         "battery_temp": "--°C",
         "resolution": "Unknown",
         "ip": "Unknown",
+        "cpu": "--%",
         "root": "Không có (Chưa root)",
         "active_app": "Trang chính (Launcher)"
     }
@@ -329,14 +330,16 @@ def get_device_info(serial: str, dynamic_only: bool = False, refresh_cache: bool
         batch_script = (
             "echo ===BATTERY===; dumpsys battery; "
             "echo ===IP===; ip route; "
-            "echo ===WIN===; dumpsys window"
+            "echo ===WIN===; dumpsys window; "
+            "echo ===CPU===; dumpsys cpuinfo | grep \"TOTAL:\" | head -n 1"
         )
     elif dynamic_only:
         # Dynamic-only requested without pre-existing cache -> query dynamic parameters only
         batch_script = (
             "echo ===BATTERY===; dumpsys battery; "
             "echo ===IP===; ip route; "
-            "echo ===WIN===; dumpsys window"
+            "echo ===WIN===; dumpsys window; "
+            "echo ===CPU===; dumpsys cpuinfo | grep \"TOTAL:\" | head -n 1"
         )
     else:
         # Full query: fetch static properties (model, brand, version, sdk, wm size, su) + dynamic
@@ -347,7 +350,8 @@ def get_device_info(serial: str, dynamic_only: bool = False, refresh_cache: bool
             "echo ===WM===; wm size; "
             "echo ===IP===; ip route; "
             "echo ===WIN===; dumpsys window; "
-            "echo ===SU===; which su"
+            "echo ===SU===; which su; "
+            "echo ===CPU===; dumpsys cpuinfo | grep \"TOTAL:\" | head -n 1"
         )
 
     code, stdout, stderr = run_adb_raw(["shell", batch_script], timeout=15, serial=serial)
@@ -454,6 +458,17 @@ def get_device_info(serial: str, dynamic_only: bool = False, refresh_cache: bool
             info["active_app"] = parts[-1] if parts else win_out.strip()
         elif win_out:
             info["active_app"] = win_out.strip()
+
+    # 6. CPU Usage Telemetry
+    cpu_out = sections.get("CPU", "").strip()
+    if cpu_out:
+        cpu_m = re.search(r"(\d+(?:\.\d+)?%)\s*TOTAL", cpu_out, re.IGNORECASE)
+        if not cpu_m:
+            cpu_m = re.search(r"TOTAL:\s*(\d+(?:\.\d+)?%)", cpu_out, re.IGNORECASE)
+        if not cpu_m:
+            cpu_m = re.search(r"(\d+(?:\.\d+)?%)", cpu_out)
+        if cpu_m:
+            info["cpu"] = cpu_m.group(1).strip()
 
     return info
 
@@ -572,10 +587,10 @@ def send_text(serial: str, text: str) -> Tuple[int, str, str]:
 # Upgraded Direct Screenshot Capture
 # ==============================================================================
 
-def take_screenshot(serial: str, output_path: str) -> bool:
-    """Capture screen directly to local PC path via exec-out screencap -p.
-    Eliminates temporary remote file /sdcard/_droid_snap.png and pull/rm roundtrips,
-    preventing race conditions and avoiding flash memory wear.
+def take_screenshot_bytes(serial: str, timeout: int = 15) -> Optional[bytes]:
+    """Capture screen directly via exec-out screencap -p and return raw PNG bytes in-memory.
+    Returns raw bytes starting with b'\x89PNG' if successful, or None on failure.
+    Runs purely in RAM without writing temporary files.
     """
     cmd = [ADB_PATH, "-s", serial, "exec-out", "screencap", "-p"]
     try:
@@ -587,20 +602,33 @@ def take_screenshot(serial: str, output_path: str) -> bool:
         proc = subprocess.run(
             cmd,
             capture_output=True,
-            timeout=15,
+            timeout=timeout,
             startupinfo=startupinfo
         )
 
         if proc.returncode == 0 and proc.stdout.startswith(b'\x89PNG'):
+            return proc.stdout
+        return None
+    except Exception:
+        return None
+
+
+def take_screenshot(serial: str, output_path: Optional[str] = None) -> Optional[bytes]:
+    """Capture screen and return raw PNG bytes.
+    If output_path is provided, also saves the PNG bytes to disk.
+    Always returns raw bytes to allow GUI preview (QPixmap) or clipboard copy.
+    """
+    data = take_screenshot_bytes(serial)
+    if data and output_path:
+        try:
             parent_dir = os.path.dirname(os.path.abspath(output_path))
             if parent_dir:
                 os.makedirs(parent_dir, exist_ok=True)
             with open(output_path, "wb") as f:
-                f.write(proc.stdout)
-            return True
-        return False
-    except Exception:
-        return False
+                f.write(data)
+        except Exception:
+            return None
+    return data
 
 
 # ==============================================================================
@@ -615,15 +643,78 @@ def install_apk(serial: str, apk_path: str) -> Tuple[bool, str]:
     return False, stdout or stderr or "Lỗi cài đặt APK"
 
 
-def switch_to_wifi(serial: str, ip: str, port: int = 5555) -> Tuple[bool, str]:
-    """Enable TCP/IP wireless debugging and connect over Wi-Fi."""
-    run_adb_raw(["tcpip", str(port)], serial=serial)
+def connect_wifi(
+    serial: str,
+    ip: Optional[str] = None,
+    port: int = 5555,
+    check: bool = False
+) -> Tuple[bool, str]:
+    """Enable TCP/IP wireless debugging and connect over Wi-Fi.
+    Checks return code and stdout/stderr of 'adb tcpip <port>' thoroughly before calling 'adb connect'.
+    If tcpip fails, returns (False, error_msg) or raises ADBError if check=True.
+    Automatically resolves target IP if omitted or passed positionally as port.
+    """
+    # Handle positional invocation where port is 2nd arg: connect_wifi(serial, 5555)
+    if isinstance(ip, int) or (isinstance(ip, str) and ip.isdigit()):
+        port = int(ip)
+        ip = None
+
+    # Step 1: Execute adb tcpip <port>
+    code, out, err = run_adb_raw(["tcpip", str(port)], serial=serial)
+    out_lower = (out or "").lower()
+    err_lower = (err or "").lower()
+    combined_err = (err or out).strip()
+
+    is_tcpip_ok = (
+        code == 0
+        and not any(term in err_lower for term in ["error", "device offline", "device not found", "cannot", "failed", "closed"])
+        and not any(term in out_lower for term in ["error", "device offline", "device not found", "cannot", "failed"])
+    )
+
+    if not is_tcpip_ok:
+        err_msg = combined_err or f"Lệnh 'adb tcpip {port}' thất bại với mã lỗi {code}"
+        if check:
+            raise ADBError(err_msg, returncode=code, stdout=out, stderr=err)
+        return False, f"Lỗi kích hoạt TCP/IP cổng {port}: {err_msg}"
+
+    # Step 2: Allow ADB daemon on Android device to rebind TCP socket
     import time
     time.sleep(1.0)
-    code, out, err = run_adb_raw(["connect", f"{ip}:{port}"])
-    if "connected to" in out.lower():
-        return True, f"Đã kết nối không dây thành công tới {ip}:{port}!"
-    return False, out or err
+
+    # Step 3: Resolve device IP address if not supplied
+    target_ip = ip
+    if not target_ip or target_ip == "Unknown":
+        try:
+            info = get_device_info(serial, dynamic_only=True)
+            target_ip = info.get("ip")
+        except Exception:
+            pass
+
+    if not target_ip or target_ip == "Unknown":
+        err_msg = f"Không xác định được địa chỉ IP của thiết bị {serial} để kết nối Wi-Fi."
+        if check:
+            raise ADBError(err_msg, returncode=-1)
+        return False, err_msg
+
+    # Step 4: Perform adb connect <ip>:<port>
+    endpoint = f"{target_ip}:{port}"
+    c_code, c_out, c_err = run_adb_raw(["connect", endpoint])
+    c_combined = (c_out or c_err).strip()
+
+    if "connected to" in c_combined.lower():
+        return True, f"Đã kết nối không dây thành công tới {endpoint}!"
+
+    err_msg = c_combined or f"Không thể kết nối Wi-Fi tới {endpoint}"
+    if check:
+        raise ADBError(err_msg, returncode=c_code, stdout=c_out, stderr=c_err)
+    return False, err_msg
+
+
+def switch_to_wifi(serial: str, ip: str, port: int = 5555, check: bool = False) -> Tuple[bool, str]:
+    """Enable TCP/IP wireless debugging and connect over Wi-Fi.
+    Maintained for backward compatibility; delegates to connect_wifi.
+    """
+    return connect_wifi(serial=serial, ip=ip, port=port, check=check)
 
 
 def reboot(serial: str, mode: str = "") -> Tuple[int, str, str]:
@@ -740,6 +831,164 @@ def parse_ui_hierarchy(xml_content: str) -> List[Dict]:
     return elements
 
 
+def load_binary_manifest(manifest_path: Optional[str] = None) -> Dict:
+    """Load and return the binary integrity manifest from bin/manifest.json or given path."""
+    if not manifest_path:
+        bin_dir = BIN_DIR or os.path.join(os.path.dirname(os.path.abspath(__file__)), "bin")
+        manifest_path = os.path.join(bin_dir, "manifest.json")
+    if not os.path.isfile(manifest_path):
+        return {}
+    import json
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict) and "files" in data and isinstance(data["files"], dict):
+                return data["files"]
+            return data
+    except Exception:
+        return {}
+
+
+def verify_binary_manifest(manifest_path: Optional[str] = None) -> Dict[str, Any]:
+    """Read bin/manifest.json (if present), cross-check the real SHA-256 hashes
+    of files in the bin directory, and return a structured dictionary with verification results.
+    """
+    import hashlib
+    import json
+
+    # 1. Locate manifest file
+    candidates = []
+    if manifest_path:
+        candidates.append(manifest_path)
+    else:
+        if BIN_DIR:
+            candidates.append(os.path.join(BIN_DIR, "manifest.json"))
+        candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "bin", "manifest.json"))
+        candidates.append(os.path.join(os.getcwd(), "bin", "manifest.json"))
+
+    target_manifest = None
+    for c in candidates:
+        if c and os.path.isfile(c):
+            target_manifest = os.path.abspath(c)
+            break
+
+    if not target_manifest:
+        return {
+            "valid": False,
+            "manifest_found": False,
+            "checked_count": 0,
+            "files": {},
+            "errors": [f"Không tìm thấy tệp manifest.json tại các đường dẫn: {candidates}"],
+            "message": "Không tìm thấy tệp bin/manifest.json."
+        }
+
+    # 2. Parse JSON
+    try:
+        with open(target_manifest, "r", encoding="utf-8") as f:
+            raw_data = json.load(f)
+    except Exception as e:
+        return {
+            "valid": False,
+            "manifest_found": True,
+            "checked_count": 0,
+            "files": {},
+            "errors": [f"Lỗi đọc hoặc phân tích manifest.json: {str(e)}"],
+            "message": f"Tệp manifest.json không hợp lệ: {str(e)}"
+        }
+
+    # 3. Extract expected files and SHA-256 hashes
+    expected_files: Dict[str, str] = {}
+    if isinstance(raw_data, dict):
+        if "files" in raw_data and isinstance(raw_data["files"], dict):
+            for k, v in raw_data["files"].items():
+                if isinstance(v, str):
+                    expected_files[k] = v.strip().lower()
+                elif isinstance(v, dict) and "sha256" in v:
+                    expected_files[k] = str(v["sha256"]).strip().lower()
+        else:
+            for k, v in raw_data.items():
+                if isinstance(v, str) and len(v.strip()) == 64:
+                    expected_files[k] = v.strip().lower()
+                elif isinstance(v, dict) and "sha256" in v:
+                    expected_files[k] = str(v["sha256"]).strip().lower()
+    elif isinstance(raw_data, list):
+        for item in raw_data:
+            if isinstance(item, dict) and "file" in item and "sha256" in item:
+                expected_files[item["file"]] = str(item["sha256"]).strip().lower()
+
+    if not expected_files:
+        return {
+            "valid": False,
+            "manifest_found": True,
+            "checked_count": 0,
+            "files": {},
+            "errors": ["Tệp manifest.json không chứa danh sách mã băm tệp hợp lệ."],
+            "message": "Không có tệp nào được định nghĩa trong manifest.json."
+        }
+
+    # 4. Check actual file hashes
+    manifest_dir = os.path.dirname(target_manifest)
+    file_details: Dict[str, Dict[str, Any]] = {}
+    errors: List[str] = []
+    all_matched = True
+
+    for filename, exp_hash in expected_files.items():
+        file_path = os.path.join(manifest_dir, filename)
+        if not os.path.isfile(file_path):
+            file_details[filename] = {
+                "status": "missing",
+                "expected_sha256": exp_hash,
+                "actual_sha256": None,
+                "path": file_path
+            }
+            errors.append(f"Tệp không tồn tại: {filename}")
+            all_matched = False
+            continue
+
+        try:
+            hasher = hashlib.sha256()
+            with open(file_path, "rb") as bf:
+                for chunk in iter(lambda: bf.read(65536), b""):
+                    hasher.update(chunk)
+            act_hash = hasher.hexdigest().lower()
+
+            if act_hash == exp_hash:
+                file_details[filename] = {
+                    "status": "ok",
+                    "expected_sha256": exp_hash,
+                    "actual_sha256": act_hash,
+                    "path": file_path
+                }
+            else:
+                file_details[filename] = {
+                    "status": "mismatch",
+                    "expected_sha256": exp_hash,
+                    "actual_sha256": act_hash,
+                    "path": file_path
+                }
+                errors.append(f"Mã băm SHA-256 không khớp cho {filename}: kỳ vọng {exp_hash[:12]}..., thực tế {act_hash[:12]}...")
+                all_matched = False
+        except Exception as e:
+            file_details[filename] = {
+                "status": "error",
+                "expected_sha256": exp_hash,
+                "actual_sha256": None,
+                "path": file_path
+            }
+            errors.append(f"Lỗi khi kiểm tra băm {filename}: {str(e)}")
+            all_matched = False
+
+    is_valid = all_matched and len(errors) == 0
+    return {
+        "valid": is_valid,
+        "manifest_found": True,
+        "checked_count": len(expected_files),
+        "files": file_details,
+        "errors": errors,
+        "message": f"Đối soát thành công {len(expected_files)}/{len(expected_files)} tệp nhị phân chuẩn 100%!" if is_valid else f"Phát hiện {len(errors)} lỗi trong quá trình đối soát tệp nhị phân."
+    }
+
+
 __all__ = [
     "ADBError",
     "DeviceOfflineError",
@@ -761,8 +1010,12 @@ __all__ = [
     "escape_unicode_text",
     "parse_ui_hierarchy",
     "take_screenshot",
+    "take_screenshot_bytes",
     "install_apk",
     "switch_to_wifi",
+    "connect_wifi",
+    "load_binary_manifest",
+    "verify_binary_manifest",
     "reboot",
     "BIN_DIR",
     "ADB_PATH",

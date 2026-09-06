@@ -195,158 +195,297 @@ def print_mission_header(serial: str = "", screen_size: Tuple[int, int] = (1080,
     console.print(Panel(table, border_style="bright_green"))
 
 
-def main():
-    serial = resolve_serial()
-    screen_size = get_screen_resolution(serial)
-    device_info = {}
-    if serial:
+class PhantomBotRunner:
+    """
+    Automated Humanized Flow Macro Runner.
+    Supports in-app lifecycle management, cooperative cancellation (Emergency Stop),
+    and custom log callbacks for GUI / HUD integration.
+    """
+    def __init__(self):
+        self._is_cancelled = False
+        self.stream_proc = None
+
+    def cancel(self):
+        """Signal the runner to abort workflow immediately."""
+        self._is_cancelled = True
+
+    @staticmethod
+    def _emit_log(msg: str, log_callback=None):
+        clean_msg = re.sub(r'\[/?[a-zA-Z0-9_ =#]+\]', '', msg)
+        if callable(log_callback):
+            try:
+                log_callback(clean_msg)
+            except Exception:
+                pass
+        if log_callback is None:
+            try:
+                console.print(msg)
+            except Exception:
+                print(clean_msg)
+
+    def run_workflow(
+        self,
+        serial: str = "",
+        log_callback=None,
+        is_cancelled=None,
+        launch_stream: bool = False
+    ) -> bool:
+        """
+        Execute the 3-phase humanized workflow (Facebook -> Chrome Tinhte -> Nekogram).
+
+        Args:
+            serial: Target Android device serial.
+            log_callback: Optional callable(str) for real-time progress logging.
+            is_cancelled: Optional callable() -> bool for cooperative cancellation.
+            launch_stream: If True, spawns an external scrcpy preview window.
+
+        Returns:
+            bool: True if completed fully, False if cancelled or aborted.
+        """
+        self._is_cancelled = False
+        target_serial = resolve_serial(serial)
+        if not target_serial:
+            self._emit_log("❌ Không tìm thấy thiết bị Android nào để chạy Bot.", log_callback)
+            return False
+
+        def check_cancelled() -> bool:
+            if self._is_cancelled:
+                return True
+            if callable(is_cancelled):
+                try:
+                    return bool(is_cancelled())
+                except Exception:
+                    return False
+            return False
+
+        def interruptible_sleep(seconds: float) -> bool:
+            end_time = time.time() + seconds
+            while time.time() < end_time:
+                if check_cancelled():
+                    return False
+                rem = end_time - time.time()
+                time.sleep(min(0.1, max(0.01, rem)))
+            return True
+
+        def handle_abort(phase_name: str = "") -> bool:
+            phase_info = f" tại [{phase_name}]" if phase_name else ""
+            self._emit_log(f"⏹️ [EMERGENCY STOP] Đã dừng Bot khẩn cấp{phase_info}.", log_callback)
+            try:
+                send_keyevent(target_serial, "3")  # Press Home
+            except Exception:
+                pass
+            return False
+
         try:
-            device_info = get_device_info(serial)
-        except Exception:
-            pass
+            screen_size = get_screen_resolution(target_serial)
+            device_info = {}
+            try:
+                device_info = get_device_info(target_serial)
+            except Exception:
+                pass
 
-    print_mission_header(serial, screen_size, device_info)
+            if launch_stream:
+                self.stream_proc = launch_scrcpy_stream(target_serial)
 
-    # Step 0: Warmup & Stream Launch
-    console.print("[bold bright_green][1/5] INITIALIZING TACTICAL SUBSYSTEMS...[/]")
-    with console.status("[bold cyan]Waking up target & launching Screen Stream HUD...", spinner="dots12"):
-        send_keyevent(serial, "224")                                    # Wakeup
-        run_adb_raw(["shell", "wm", "dismiss-keyguard"], serial=serial) # Unlock
-        send_keyevent(serial, "3")                                      # Home
-        stream_proc = launch_scrcpy_stream(serial)
-        time.sleep(2.5)
+            if log_callback is None:
+                print_mission_header(target_serial, screen_size, device_info)
+            else:
+                self._emit_log(f"🤖 Bắt đầu chu trình PhantomBot trên [{target_serial}] ({screen_size[0]}x{screen_size[1]})...", log_callback)
 
-    console.print("[bold bright_green][✓] Scrcpy stream engaged. Live Screen is now streaming on your PC.[/]")
-    time.sleep(1)
+            # Step 0: Warmup
+            if check_cancelled():
+                return handle_abort("Khởi động")
 
-    total_mission_start = time.time()
+            send_keyevent(target_serial, "224")                                    # Wakeup
+            run_adb_raw(["shell", "wm", "dismiss-keyguard"], serial=target_serial) # Unlock
+            send_keyevent(target_serial, "3")                                      # Home
 
-    # PHASE 1: FACEBOOK (~20s)
-    console.print("\n[bold bright_cyan]══════════════════════════════════════════════════════════════════════[/]")
-    console.print("[bold bright_green]▶ [PHASE 1/3] TARGET: FACEBOOK (com.facebook.katana)[/]")
-    console.print("[dim cyan][*] Action: Infiltrating news feed // Simulating humanized reading scroll...[/]")
-    console.print("[bold bright_yellow][!] Policy: Strict surveillance mode (Zero likes, Zero comments).[/]")
+            if not interruptible_sleep(1.5):
+                return handle_abort("Khởi động")
 
-    # Launch Facebook
-    run_adb_raw(["shell", "monkey", "-p", APP_FACEBOOK, "-c", "android.intent.category.LAUNCHER", "1"], serial=serial)
-    time.sleep(3.5) # Wait for feed to load
+            total_mission_start = time.time()
 
-    fb_start = time.time()
-    fb_duration = 20.0
-    swipe_count = 0
+            # PHASE 1: FACEBOOK (~20s)
+            self._emit_log("▶ [1/3] TARGET: FACEBOOK (com.facebook.katana) - Lướt News Feed...", log_callback)
+            run_adb_raw(["shell", "monkey", "-p", APP_FACEBOOK, "-c", "android.intent.category.LAUNCHER", "1"], serial=target_serial)
 
-    with Progress(
-        SpinnerColumn(spinner_name="line", style="bold green"),
-        TextColumn("[bold bright_green]{task.description}"),
-        BarColumn(bar_width=35, style="green", complete_style="bold bright_green"),
-        TextColumn("[bold cyan]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task_fb = progress.add_task("[bold cyan]Executing Facebook News Feed Flow...", total=fb_duration)
-        while (time.time() - fb_start) < fb_duration:
-            elapsed = time.time() - fb_start
-            progress.update(task_fb, completed=min(elapsed, fb_duration))
+            if not interruptible_sleep(3.5):
+                return handle_abort("Facebook (Load)")
 
-            # Decide swipe action
-            swipe_type = "down"
-            if swipe_count > 1 and random.random() < 0.25:
-                # 25% chance of slight micro-backscroll (human reading behavior)
-                swipe_type = "up"
-            elif random.random() < 0.15:
-                swipe_type = "flick"
+            fb_start = time.time()
+            fb_duration = 20.0
+            fb_swipes = 0
 
-            human_swipe(swipe_type, screen_size=screen_size, serial=serial)
-            swipe_count += 1
+            if log_callback is None:
+                with Progress(
+                    SpinnerColumn(spinner_name="line", style="bold green"),
+                    TextColumn("[bold bright_green]{task.description}"),
+                    BarColumn(bar_width=35, style="green", complete_style="bold bright_green"),
+                    TextColumn("[bold cyan]{task.percentage:>3.0f}%"),
+                    TimeElapsedColumn(),
+                    console=console,
+                ) as progress:
+                    task_fb = progress.add_task("[bold cyan]Executing Facebook News Feed Flow...", total=fb_duration)
+                    while (time.time() - fb_start) < fb_duration:
+                        if check_cancelled():
+                            return handle_abort("Facebook")
+                        elapsed = time.time() - fb_start
+                        progress.update(task_fb, completed=min(elapsed, fb_duration))
 
-            # Pause to "read"
-            pause_time = random.uniform(2.2, 3.8)
-            time.sleep(pause_time)
+                        swipe_type = "down"
+                        if fb_swipes > 1 and random.random() < 0.25:
+                            swipe_type = "up"
+                        elif random.random() < 0.15:
+                            swipe_type = "flick"
 
-    console.print(f"[bold bright_green][✓] Facebook flow complete ({swipe_count} scroll actions executed).[/]")
+                        human_swipe(swipe_type, screen_size=screen_size, serial=target_serial)
+                        fb_swipes += 1
 
-    # PHASE 2: TECH NEWS VIA CHROME (~20s)
-    console.print("\n[bold bright_cyan]══════════════════════════════════════════════════════════════════════[/]")
-    console.print(f"[bold bright_green]▶ [PHASE 2/3] TARGET: TECH NEWS AUTOMATION VIA CHROME ({TECH_URL})[/]")
-    console.print("[dim cyan][*] Action: Deep-linking to Tinhte tech portal // Reading tech news headlines...[/]")
+                        pause_time = random.uniform(2.2, 3.8)
+                        if not interruptible_sleep(pause_time):
+                            return handle_abort("Facebook")
+            else:
+                while (time.time() - fb_start) < fb_duration:
+                    if check_cancelled():
+                        return handle_abort("Facebook")
 
-    # Launch Chrome directly with URL
-    run_adb_raw(["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", TECH_URL, APP_CHROME], serial=serial)
-    time.sleep(4.0) # Wait for page load
+                    swipe_type = "down"
+                    if fb_swipes > 1 and random.random() < 0.25:
+                        swipe_type = "up"
+                    elif random.random() < 0.15:
+                        swipe_type = "flick"
 
-    chrome_start = time.time()
-    chrome_duration = 20.0
-    chrome_swipes = 0
+                    human_swipe(swipe_type, screen_size=screen_size, serial=target_serial)
+                    fb_swipes += 1
 
-    with Progress(
-        SpinnerColumn(spinner_name="line", style="bold cyan"),
-        TextColumn("[bold bright_cyan]{task.description}"),
-        BarColumn(bar_width=35, style="cyan", complete_style="bold bright_cyan"),
-        TextColumn("[bold cyan]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task_chrome = progress.add_task("[bold bright_cyan]Reading Tech Articles & Trends...", total=chrome_duration)
-        while (time.time() - chrome_start) < chrome_duration:
-            elapsed = time.time() - chrome_start
-            progress.update(task_chrome, completed=min(elapsed, chrome_duration))
+                    pause_time = random.uniform(2.2, 3.8)
+                    if not interruptible_sleep(pause_time):
+                        return handle_abort("Facebook")
 
-            swipe_type = "down"
-            if chrome_swipes > 2 and random.random() < 0.2:
-                swipe_type = "up" # Re-read headline
+            self._emit_log(f"✓ Facebook flow hoàn thành ({fb_swipes} lượt cuộn).", log_callback)
 
-            human_swipe(swipe_type, screen_size=screen_size, serial=serial)
-            chrome_swipes += 1
+            if check_cancelled():
+                return handle_abort("Chuyển tiếp")
 
-            pause_time = random.uniform(2.4, 4.0)
-            time.sleep(pause_time)
+            # PHASE 2: TECH NEWS VIA CHROME (~20s)
+            self._emit_log(f"▶ [2/3] TARGET: Tech News ({TECH_URL}) qua Chrome...", log_callback)
+            run_adb_raw(["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", TECH_URL, APP_CHROME], serial=target_serial)
 
-    console.print(f"[bold bright_green][✓] Tech news browsing completed ({chrome_swipes} articles browsed).[/]")
+            if not interruptible_sleep(4.0):
+                return handle_abort("Chrome (Load)")
 
-    # PHASE 3: NEKOGRAM (~20s)
-    console.print("\n[bold bright_cyan]══════════════════════════════════════════════════════════════════════[/]")
-    console.print("[bold bright_green]▶ [PHASE 3/3] TARGET: MESSENGER PATROL [NEKOGRAM] (tw.nekomimi.nekogram)[/]")
-    console.print("[dim cyan][*] Action: Browsing chat feeds & telegram channels...[/]")
+            chrome_start = time.time()
+            chrome_duration = 20.0
+            chrome_swipes = 0
 
-    # Launch Nekogram
-    run_adb_raw(["shell", "monkey", "-p", APP_NEKOGRAM, "-c", "android.intent.category.LAUNCHER", "1"], serial=serial)
-    time.sleep(3.0)
+            if log_callback is None:
+                with Progress(
+                    SpinnerColumn(spinner_name="line", style="bold cyan"),
+                    TextColumn("[bold bright_cyan]{task.description}"),
+                    BarColumn(bar_width=35, style="cyan", complete_style="bold bright_cyan"),
+                    TextColumn("[bold cyan]{task.percentage:>3.0f}%"),
+                    TimeElapsedColumn(),
+                    console=console,
+                ) as progress:
+                    task_chrome = progress.add_task("[bold bright_cyan]Reading Tech Articles & Trends...", total=chrome_duration)
+                    while (time.time() - chrome_start) < chrome_duration:
+                        if check_cancelled():
+                            return handle_abort("Chrome")
+                        elapsed = time.time() - chrome_start
+                        progress.update(task_chrome, completed=min(elapsed, chrome_duration))
 
-    neko_start = time.time()
-    neko_duration = 20.0
-    neko_swipes = 0
+                        swipe_type = "down"
+                        if chrome_swipes > 2 and random.random() < 0.2:
+                            swipe_type = "up"
 
-    with Progress(
-        SpinnerColumn(spinner_name="line", style="bold magenta"),
-        TextColumn("[bold bright_magenta]{task.description}"),
-        BarColumn(bar_width=35, style="magenta", complete_style="bold bright_magenta"),
-        TextColumn("[bold cyan]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
-        console=console,
-    ) as progress:
-        task_neko = progress.add_task("[bold bright_magenta]Browsing Nekogram Channels & Chats...", total=neko_duration)
-        while (time.time() - neko_start) < neko_duration:
-            elapsed = time.time() - neko_start
-            progress.update(task_neko, completed=min(elapsed, neko_duration))
+                        human_swipe(swipe_type, screen_size=screen_size, serial=target_serial)
+                        chrome_swipes += 1
 
-            human_swipe("down", screen_size=screen_size, serial=serial)
-            neko_swipes += 1
+                        pause_time = random.uniform(2.4, 4.0)
+                        if not interruptible_sleep(pause_time):
+                            return handle_abort("Chrome")
+            else:
+                while (time.time() - chrome_start) < chrome_duration:
+                    if check_cancelled():
+                        return handle_abort("Chrome")
 
-            pause_time = random.uniform(2.0, 3.5)
-            time.sleep(pause_time)
+                    swipe_type = "down"
+                    if chrome_swipes > 2 and random.random() < 0.2:
+                        swipe_type = "up"
 
-    console.print(f"[bold bright_green][✓] Nekogram channel patrol completed ({neko_swipes} scrolls executed).[/]")
+                    human_swipe(swipe_type, screen_size=screen_size, serial=target_serial)
+                    chrome_swipes += 1
 
-    # PHASE 4: CLEANUP & RETURN SECURE LAUNCHER
-    console.print("\n[bold bright_cyan]══════════════════════════════════════════════════════════════════════[/]")
-    console.print("[bold bright_yellow][*] RETURNING TO HOME LAUNCHER...[/]")
-    send_keyevent(serial, "3") # Home key
-    time.sleep(1.0)
+                    pause_time = random.uniform(2.4, 4.0)
+                    if not interruptible_sleep(pause_time):
+                        return handle_abort("Chrome")
 
-    total_time = time.time() - total_mission_start
+            self._emit_log(f"✓ Tech news flow hoàn thành ({chrome_swipes} lượt duyệt bài).", log_callback)
 
-    finish_panel = Panel(
-        f"""[bold bright_green]◈ FLOW EXECUTION COMPLETED: ALL TARGETS PROCESSED IN {total_time:.1f} SECONDS ◈[/]
+            if check_cancelled():
+                return handle_abort("Chuyển tiếp")
+
+            # PHASE 3: NEKOGRAM (~20s)
+            self._emit_log("▶ [3/3] TARGET: Messenger Patrol [Nekogram] (tw.nekomimi.nekogram)...", log_callback)
+            run_adb_raw(["shell", "monkey", "-p", APP_NEKOGRAM, "-c", "android.intent.category.LAUNCHER", "1"], serial=target_serial)
+
+            if not interruptible_sleep(3.0):
+                return handle_abort("Nekogram (Load)")
+
+            neko_start = time.time()
+            neko_duration = 20.0
+            neko_swipes = 0
+
+            if log_callback is None:
+                with Progress(
+                    SpinnerColumn(spinner_name="line", style="bold magenta"),
+                    TextColumn("[bold bright_magenta]{task.description}"),
+                    BarColumn(bar_width=35, style="magenta", complete_style="bold bright_magenta"),
+                    TextColumn("[bold cyan]{task.percentage:>3.0f}%"),
+                    TimeElapsedColumn(),
+                    console=console,
+                ) as progress:
+                    task_neko = progress.add_task("[bold bright_magenta]Browsing Nekogram Channels & Chats...", total=neko_duration)
+                    while (time.time() - neko_start) < neko_duration:
+                        if check_cancelled():
+                            return handle_abort("Nekogram")
+                        elapsed = time.time() - neko_start
+                        progress.update(task_neko, completed=min(elapsed, neko_duration))
+
+                        human_swipe("down", screen_size=screen_size, serial=target_serial)
+                        neko_swipes += 1
+
+                        pause_time = random.uniform(2.0, 3.5)
+                        if not interruptible_sleep(pause_time):
+                            return handle_abort("Nekogram")
+            else:
+                while (time.time() - neko_start) < neko_duration:
+                    if check_cancelled():
+                        return handle_abort("Nekogram")
+
+                    human_swipe("down", screen_size=screen_size, serial=target_serial)
+                    neko_swipes += 1
+
+                    pause_time = random.uniform(2.0, 3.5)
+                    if not interruptible_sleep(pause_time):
+                        return handle_abort("Nekogram")
+
+            self._emit_log(f"✓ Nekogram channel patrol hoàn thành ({neko_swipes} lượt cuộn).", log_callback)
+
+            # PHASE 4: CLEANUP & RETURN TO SECURE LAUNCHER
+            if check_cancelled():
+                return handle_abort("Cleanup")
+
+            self._emit_log("🏠 Hoàn thành kịch bản. Trở về màn hình chính (Home)...", log_callback)
+            send_keyevent(target_serial, "3")
+            interruptible_sleep(1.0)
+
+            total_time = time.time() - total_mission_start
+            self._emit_log(f"🎉 Toàn bộ chu trình PhantomBot đã kết thúc thành công trong {total_time:.1f} giây!", log_callback)
+
+            if log_callback is None:
+                finish_panel = Panel(
+                    f"""[bold bright_green]◈ FLOW EXECUTION COMPLETED: ALL TARGETS PROCESSED IN {total_time:.1f} SECONDS ◈[/]
 
   [white]• Target [1]:[/] [bold bright_green]Facebook (com.facebook.katana)[/]      [dim]→ 20s Clean Humanized Browsing[/]
   [white]• Target [2]:[/] [bold bright_cyan]Chrome [Tinhte Tech Portal][/]          [dim]→ 20s Humanized News Flow[/]
@@ -354,11 +493,27 @@ def main():
   [white]• Live HUD  :[/] [bold yellow]Scrcpy Hardware Mirror[/]                [dim]→ Streamed Live to PC Screen[/]
   [white]• Footprint :[/] [bold blink green]ZERO LIKES // ZERO COMMENTS // CLEAN AUTOMATION[/]
 """,
-        title="[bold bright_green]✔ OPERATION COMPLETED[/]",
-        border_style="bright_green"
-    )
-    console.print(finish_panel)
-    console.print("[dim green]Cửa sổ stream màn hình vẫn đang hoạt động. Anh có thể thao tác tiếp hoặc đóng lại bất cứ lúc nào.[/]\n")
+                    title="[bold bright_green]✔ OPERATION COMPLETED[/]",
+                    border_style="bright_green"
+                )
+                console.print(finish_panel)
+                console.print("[dim green]Cửa sổ stream màn hình vẫn đang hoạt động. Anh có thể thao tác tiếp hoặc đóng lại bất cứ lúc nào.[/]\n")
+
+            return True
+
+        except Exception as e:
+            self._emit_log(f"❌ Ngoại lệ trong quá trình thực thi PhantomBot: {e}", log_callback)
+            try:
+                send_keyevent(target_serial, "3")
+            except Exception:
+                pass
+            return False
+
+
+def main():
+    serial = resolve_serial()
+    runner = PhantomBotRunner()
+    runner.run_workflow(serial, launch_stream=True)
 
 
 if __name__ == "__main__":
@@ -367,4 +522,5 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         console.print("\n[bold red][!] FLOW ABORTED BY USER OVERRIDE.[/]")
-        send_keyevent(_serial, "3")
+        if _serial:
+            send_keyevent(_serial, "3")

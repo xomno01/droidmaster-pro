@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "generated_by": "DroidMaster Security Auditor",
+  "files": {
+    "adb.exe": "957e46b8615f7af5b7292a2ddabe98d2e61940c3fb2b0545756507f080613e71",
+    "AdbWinApi.dll": "120bef587119c6cb926b86b9be90fdfbce38937588eae28cd91a94ce63c7b965",
+    "AdbWinUsbApi.dll": "6ca69a2ca0e31309c087d288f058977d421ad03500e4c3e1dbd981241a069c60",
+    "avcodec-62.dll": "7179de2b132e78eb0a76458a0a3859dfe1edcbb6d2eeb4a456f03f7ae96d5b66",
+    "avformat-62.dll": "7232316acce00371d89f589748b570d95885ea6bbfc1972a0a9d3b884903eee1",
+    "avutil-60.dll": "3d6170dd68549c6f39b8d8710a37f79d9678905df705a8b0a6bc7ea9037daddf",
+    "libusb-1.0.dll": "8ec130918a476b0dbd114c803e71314360608ceabdd2b6f38c83f6f208c608e0",
+    "scrcpy.exe": "575ca1284345c7b3975585bc61b66d564a9a4f1ecb28fbb4c599c92a124054a9",
+    "scrcpy-server": "deacb991ed2509715160ffdc7907e47b4160eb30d1566217e9047fd5b8850cae",
+    "SDL3.dll": "0619eb2da6032984dc6e2098897aeacdbd66b0415bb87bc03e628159ba60b15d",
+    "swresample-6.dll": "4cc809d2cd822e186906fbc9d8a0acffa937e35de1282b2e2ab7346cfed96fed"
+  }
+}
