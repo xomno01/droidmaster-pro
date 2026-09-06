@@ -38,7 +38,7 @@ QFrame.bentoCard {
     background-color: #111827;
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 16px;
-    padding: 14px 12px;
+    padding: 0px;
 }
 QFrame.bentoCard:hover {
     border-color: rgba(255, 255, 255, 0.14);
@@ -71,7 +71,7 @@ QFrame#heroCard {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #131d2e, stop:1 #0f172a);
     border: 1px solid rgba(56, 189, 248, 0.25);
     border-radius: 18px;
-    padding: 16px 14px;
+    padding: 0px;
 }
 
 /* Labels */

@@ -11,7 +11,7 @@ import sys
 import time
 import subprocess
 import threading
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize, QEvent
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QGridLayout, QLabel, QPushButton, QComboBox, QCheckBox,
@@ -88,7 +88,7 @@ class DroidMasterApp(QMainWindow):
         icon_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_icon.ico")
         if os.path.exists(icon_file):
             self.setWindowIcon(QIcon(icon_file))
-        self.resize(1020, 740)
+        self.resize(960, 620)
         self.setMinimumSize(680, 460)
         self.setStyleSheet(DARK_THEME_QSS)
 
@@ -307,19 +307,19 @@ class DroidMasterApp(QMainWindow):
         hero_card = QFrame()
         hero_card.setObjectName("heroCard")
         hero_layout = QVBoxLayout(hero_card)
-        hero_layout.setContentsMargins(16, 14, 16, 14)
-        hero_layout.setSpacing(12)
+        hero_layout.setContentsMargins(14, 12, 14, 12)
+        hero_layout.setSpacing(10)
 
         # 1. Header Title Block
         hero_title_box = QVBoxLayout()
         hero_title_box.setSpacing(3)
 
         lbl_hero_head = QLabel("🖥️ Chiếu Màn Hình Thời Gian Thực (Scrcpy Pro)")
-        lbl_hero_head.setStyleSheet("font-size: 16px; font-weight: 800; color: #f8fafc;")
+        lbl_hero_head.setStyleSheet("font-size: 15px; font-weight: 800; color: #f8fafc;")
         lbl_hero_head.setWordWrap(True)
 
         lbl_hero_sub = QLabel("Chuẩn 60 FPS • Độ trễ 35-70ms • GPU giải mã siêu nhẹ (< 1% CPU)")
-        lbl_hero_sub.setStyleSheet("font-size: 12px; color: #94a3b8;")
+        lbl_hero_sub.setStyleSheet("font-size: 11px; color: #94a3b8;")
         lbl_hero_sub.setWordWrap(True)
 
         hero_title_box.addWidget(lbl_hero_head)
@@ -330,44 +330,44 @@ class DroidMasterApp(QMainWindow):
         self.btn_hero_stream = QPushButton("▶ BẬT CHIẾU MÀN HÌNH")
         self.btn_hero_stream.setObjectName("primaryHeroBtn")
         self.btn_hero_stream.setCursor(QCursor(Qt.PointingHandCursor))
-        self.btn_hero_stream.setMinimumHeight(42)
-        self.btn_hero_stream.setMinimumWidth(180)
+        self.btn_hero_stream.setMinimumHeight(40)
+        self.btn_hero_stream.setMinimumWidth(160)
         self.btn_hero_stream.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.btn_hero_stream.clicked.connect(self.action_toggle_stream)
         hero_layout.addWidget(self.btn_hero_stream)
 
-        # 3. Toggles Grid: 2 rows x 2 columns
+        # 3. Toggles Grid (Row 0: 2 checks, Row 1: 1 check)
         toggles_grid = QGridLayout()
-        toggles_grid.setHorizontalSpacing(14)
-        toggles_grid.setVerticalSpacing(8)
+        toggles_grid.setHorizontalSpacing(10)
+        toggles_grid.setVerticalSpacing(6)
 
-        self.chk_turn_off = QCheckBox("Tắt màn hình điện thoại")
-        self.chk_turn_off.setToolTip("Tắt màn hình điện thoại (Chống nóng máy)")
-        self.chk_always_top = QCheckBox("Luôn ghim trên cùng")
-        self.chk_always_top.setToolTip("Luôn ghim trên cùng (Always on Top)")
+        self.chk_turn_off = QCheckBox("Tắt màn hình máy")
+        self.chk_turn_off.setToolTip("Tắt màn hình điện thoại để chống nóng máy")
+        self.chk_always_top = QCheckBox("Ghim trên cùng")
+        self.chk_always_top.setToolTip("Luôn ghim cửa sổ trên cùng (Always on Top)")
         self.chk_always_top.setChecked(True)
-        self.chk_stay_awake = QCheckBox("Không khóa màn hình")
-        self.chk_stay_awake.setToolTip("Không khóa màn hình (Stay awake)")
+        self.chk_stay_awake = QCheckBox("Giữ sáng máy")
+        self.chk_stay_awake.setToolTip("Không khóa màn hình điện thoại (Stay awake)")
         self.chk_stay_awake.setChecked(True)
-
-        # Quality Combo (with label)
-        quality_box = QHBoxLayout()
-        quality_box.setContentsMargins(0, 0, 0, 0)
-        quality_box.setSpacing(6)
-        lbl_q = QLabel("Chất lượng:")
-        lbl_q.setStyleSheet("color: #64748b; font-size: 12px;")
-        self.combo_quality = QComboBox()
-        self.combo_quality.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.combo_quality.addItems(["Chuẩn (1080p - 8Mbps)", "Siêu nhẹ (720p - 4Mbps)", "Gốc (Full HD+ - 16Mbps)"])
-        quality_box.addWidget(lbl_q)
-        quality_box.addWidget(self.combo_quality)
 
         toggles_grid.addWidget(self.chk_turn_off, 0, 0)
         toggles_grid.addWidget(self.chk_always_top, 0, 1)
         toggles_grid.addWidget(self.chk_stay_awake, 1, 0)
-        toggles_grid.addLayout(quality_box, 1, 1)
-
         hero_layout.addLayout(toggles_grid)
+
+        # 4. Stream Quality Row (spans full card width cleanly)
+        quality_box = QHBoxLayout()
+        quality_box.setContentsMargins(0, 0, 0, 0)
+        quality_box.setSpacing(6)
+        lbl_q = QLabel("Độ nét:")
+        lbl_q.setStyleSheet("color: #64748b; font-size: 11px;")
+        self.combo_quality = QComboBox()
+        self.combo_quality.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.combo_quality.addItems(["1080p (Chuẩn)", "720p (Nhẹ)", "Gốc (Full HD+)"])
+        quality_box.addWidget(lbl_q)
+        quality_box.addWidget(self.combo_quality)
+        hero_layout.addLayout(quality_box)
+
         content_layout.addWidget(hero_card)
 
         # -------------------------------------------------------------
@@ -385,15 +385,15 @@ class DroidMasterApp(QMainWindow):
             tile = QFrame()
             tile.setProperty("class", "bentoCard")
             tile.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-            tile.setMinimumHeight(125)
+            tile.setMinimumHeight(115)
             t_layout = QVBoxLayout(tile)
-            t_layout.setContentsMargins(16, 14, 16, 14)
-            t_layout.setSpacing(6)
+            t_layout.setContentsMargins(12, 10, 12, 10)
+            t_layout.setSpacing(5)
 
             head_h = QHBoxLayout()
             head_h.setSpacing(8)
             icon_lbl = QLabel(icon)
-            icon_lbl.setStyleSheet(f"font-size: 20px; color: {accent_color};")
+            icon_lbl.setStyleSheet(f"font-size: 18px; color: {accent_color};")
             t_title = QLabel(title)
             t_title.setObjectName("cardTitle")
             t_title.setWordWrap(True)
@@ -405,7 +405,7 @@ class DroidMasterApp(QMainWindow):
             t_desc.setWordWrap(True)
 
             action_btn = QPushButton(btn_text)
-            action_btn.setMinimumHeight(36)
+            action_btn.setMinimumHeight(34)
             action_btn.setCursor(QCursor(Qt.PointingHandCursor))
             action_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             action_btn.clicked.connect(callback)
@@ -510,23 +510,30 @@ class DroidMasterApp(QMainWindow):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.scroll.setFrameShape(QFrame.NoFrame)
-        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.scroll.setWidget(self.main_content)
+        self.scroll.viewport().installEventFilter(self)
 
         root_layout.addWidget(self.scroll, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.8.0 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.8.1 sẵn sàng.")
+
+    def eventFilter(self, watched, event):
+        if hasattr(self, 'scroll') and watched == self.scroll.viewport():
+            if event.type() == QEvent.Resize:
+                self.relayout_bento(self.scroll.viewport().width())
+        return super().eventFilter(watched, event)
 
     def relayout_bento(self, width: int = None):
         if not hasattr(self, 'bento_tiles') or not hasattr(self, 'bento_grid'):
             return
         if width is None or width <= 0:
-            if hasattr(self, 'main_content') and self.main_content.width() > 0:
-                width = self.main_content.width()
-            elif hasattr(self, 'scroll') and self.scroll.viewport().width() > 0:
+            if hasattr(self, 'scroll') and self.scroll.viewport().width() > 0:
                 width = self.scroll.viewport().width()
+            elif hasattr(self, 'main_content') and self.main_content.width() > 0:
+                width = self.main_content.width()
             else:
                 width = 500
 
@@ -556,10 +563,8 @@ class DroidMasterApp(QMainWindow):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if hasattr(self, 'main_content') and hasattr(self, 'bento_grid'):
-            w = self.main_content.width()
-            if w <= 0 and hasattr(self, 'scroll') and self.scroll.viewport().width() > 0:
-                w = self.scroll.viewport().width()
+        if hasattr(self, 'scroll') and hasattr(self, 'bento_grid'):
+            w = self.scroll.viewport().width()
             self.relayout_bento(w)
 
     # =================================================================
