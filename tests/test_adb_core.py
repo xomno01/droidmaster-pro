@@ -39,6 +39,9 @@ from adb_core import (
     take_screenshot_bytes,
     connect_wifi,
     switch_to_wifi,
+    connect_endpoint,
+    load_config,
+    save_config,
     load_binary_manifest,
     verify_binary_manifest,
     DeviceOfflineError,
@@ -465,6 +468,29 @@ class TestADBCore(unittest.TestCase):
             ok, msg = switch_to_wifi("mock_device", "192.168.1.100", 5555)
             self.assertTrue(ok)
             self.assertIn("192.168.1.100:5555", msg)
+
+    def test_connect_endpoint_direct(self):
+        """Test connect_endpoint connects directly to IP or IP:port without requiring USB."""
+        with patch("adb_core.run_adb_raw", return_value=(0, "connected to 192.168.0.50:5555", "")):
+            ok, msg = connect_endpoint("192.168.0.50")
+            self.assertTrue(ok)
+            self.assertIn("192.168.0.50:5555", msg)
+
+        # Test failure
+        with patch("adb_core.run_adb_raw", return_value=(1, "", "cannot connect to 192.168.0.50:5555")):
+            ok, msg = connect_endpoint("192.168.0.50")
+            self.assertFalse(ok)
+            self.assertIn("cannot connect", msg)
+
+    def test_config_persistence(self):
+        """Test load_config and save_config functionality."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            test_cfg_path = os.path.join(tmp_dir, "test_config.json")
+            with patch("adb_core.CONFIG_PATH", test_cfg_path):
+                save_config("last_wifi_endpoint", "10.0.0.99:5555")
+                cfg = load_config()
+                self.assertEqual(cfg.get("last_wifi_endpoint"), "10.0.0.99:5555")
 
     def test_verify_binary_manifest_real_and_mock(self):
         """Test verify_binary_manifest on actual bin/manifest.json and edge cases."""

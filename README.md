@@ -1,17 +1,17 @@
-# ⚡ DroidMaster Pro v2.8.3 — Universal Android Control Center (Seamless Wi-Fi Handoff)
+# ⚡ DroidMaster Pro v2.8.4 — Universal Android Control Center (Persistent Wireless Auto-Reconnect)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Tự động chuyển đổi kết nối không dây Wi-Fi & Hotplug • Kiến trúc Enterprise v2.8.3</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Tự động quét & kết nối lại Wi-Fi vĩnh viễn không cần cáp • Kiến trúc Enterprise v2.8.4</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.8.3%20(Seamless--Wi--Fi--Handoff)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.3" />
-  <img src="https://img.shields.io/badge/Tests-16%2F16%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 16/16 Passing" />
+  <img src="https://img.shields.io/badge/Version-v2.8.4%20(Auto--Reconnect)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.4" />
+  <img src="https://img.shields.io/badge/Tests-18%2F18%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 18/18 Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
   <img src="https://img.shields.io/badge/Mirror-Scrcpy%204.1-FF6B6B?style=for-the-badge" alt="Scrcpy 4.1" />
@@ -22,18 +22,21 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.3 (Seamless Wi-Fi Handoff)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.4 (Persistent Wireless Auto-Reconnect)
 
-Phiên bản **v2.8.3** hoàn thiện triệt để đường ống điều khiển không dây Wi-Fi và cơ chế luồng bất đồng bộ:
+Phiên bản **v2.8.4** mang tới bước đột phá loại bỏ hoàn toàn nhu cầu cắm cáp USB cho các phiên sử dụng tiếp theo:
 
-* 📶 **Kích Hoạt Wi-Fi Bất Đồng Bộ & Tự Động Chuyển Thiết Bị Tức Thì:**
-  Khắc phục hoàn toàn lỗi nút "Bật kết nối Wi-Fi" không phản hồi khi bấm do thiếu lệnh dispatch luồng. Bổ sung cơ chế phát hiện thông minh: nếu thiết bị đã được kết nối Wi-Fi trước đó (`<ip>:5555`), ứng dụng lập tức nhận diện và tự động chuyển đổi danh sách thiết bị đang hoạt động sang Wi-Fi trong 0ms. Nếu là phiên kết nối mới, lệnh chuyển đổi chạy hoàn toàn trên nền `AsyncWorker` ngầm mà không gây đơ/treo giao diện.
+* 📶 **Khởi Động Tự Động Quét & Kết Nối Wi-Fi (Persistent Auto-Reconnect):**
+  Lưu trữ an toàn endpoint thiết bị Wi-Fi gần nhất (`config.json`). Mỗi khi người dùng mở DroidMaster Pro lên (ngay cả khi **hoàn toàn không cắm bất kỳ sợi dây cáp USB nào**), ứng dụng tự động phát hiện và kết nối lại thiết bị qua Wi-Fi trong vòng **< 1 giây**. Thiết bị lập tức chuyển sang trạng thái `ONLINE` trên combobox sẵn sàng điều khiển.
 
-* 🔌 **Rút Cáp USB An Toàn — Tiếp Tục Chiếu Màn Hình Không Gián Đoạn:**
-  Khi chuyển đổi Wi-Fi thành công, ứng dụng hiển thị hộp thoại hướng dẫn người dùng rút cáp USB an toàn. Cửa sổ chiếu màn hình Scrcpy và bộ phím điều khiển từ xa tự động bám theo endpoint Wi-Fi, không bao giờ rơi vào trạng thái "device not found".
+* 🎬 **Tự Động Kết Nối Wi-Fi Trước Khi Chiếu Màn Hình:**
+  Khi bấm **"▶ BẬT CHIẾU MÀN HÌNH"**, nếu máy chưa kết nối sẵn, ứng dụng tự động gọi kết nối nhanh tới endpoint Wi-Fi đã lưu trước khi kích hoạt Scrcpy, triệt tiêu hoàn toàn thông báo lỗi *"Không tìm thấy thiết bị Android"*.
 
-* 🧪 **Bộ Kiểm Thử Mở Rộng Lên 16 Unit Tests (100% Pass):**
-  Bổ sung các bài kiểm tra chuyên sâu cho luồng kết nối Wi-Fi tự động, xử lý trường hợp thiết bị đã kết nối sẵn, tái kết nối thông minh và ủy quyền lệnh `switch_to_wifi`.
+* ⌨️ **Hộp Thoại Nhập IP Kết Nối Trực Tiếp (Cable-Free Onboarding):**
+  Khi bấm nút **"Không Dây Wi-Fi"** trong trạng thái không cắm cáp, ứng dụng không còn từ chối mà mở ngay hộp thoại nhập địa chỉ IP (điền sẵn IP cũ làm mặc định) để người dùng kết nối thẳng tới bất kỳ thiết bị Android nào trong cùng mạng mạng nội bộ.
+
+* 🧪 **Bộ Kiểm Thử Mở Rộng Lên 18 Unit Tests (100% Pass):**
+  Bổ sung các bài kiểm tra chuyên sâu cho `connect_endpoint`, lưu trữ cấu hình bền vững (`config.json`), và kiểm thử tái kết nối không dây.
 
 * ⚡ **Hotplug Detection Thời Gian Thực:**
   Hệ thống tự động phát hiện thiết bị cắm vào hoặc rút ra khỏi máy tính trong chu kỳ telemetry. Danh sách combobox tự động làm mới, hiển thị rõ icon nhận diện (🔌 USB / 📶 Wi-Fi), tự động phục hồi về thiết bị khả dụng gần nhất.

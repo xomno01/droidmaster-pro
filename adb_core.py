@@ -5,6 +5,7 @@ Provides high-performance, asynchronous ADB & Scrcpy wrappers for Android device
 """
 
 import glob
+import json
 import os
 import re
 import shlex
@@ -715,11 +716,59 @@ def connect_wifi(
     c_combined = (c_out or c_err).strip()
 
     if "connected to" in c_combined.lower():
+        save_config("last_wifi_endpoint", endpoint)
         return True, f"Đã kết nối không dây thành công tới {endpoint}!"
 
     err_msg = c_combined or f"Không thể kết nối Wi-Fi tới {endpoint}"
     if check:
         raise ADBError(err_msg, returncode=c_code, stdout=c_out, stderr=c_err)
+    return False, err_msg
+
+
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json")
+
+
+def load_config() -> Dict[str, Any]:
+    """Load persistent configuration dictionary."""
+    try:
+        if os.path.isfile(CONFIG_PATH):
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+
+def save_config(key: str, value: Any) -> None:
+    """Save persistent configuration key-value pair."""
+    try:
+        cfg = load_config()
+        cfg[key] = value
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def connect_endpoint(endpoint: str, timeout: int = 5, check: bool = False) -> Tuple[bool, str]:
+    """Connect directly to a TCP/IP endpoint without requiring an existing USB serial.
+    If port is omitted, defaults to 5555.
+    """
+    target = endpoint.strip()
+    if not target:
+        return False, "Địa chỉ IP / endpoint không hợp lệ."
+    if ":" not in target:
+        target = f"{target}:5555"
+
+    code, out, err = run_adb_raw(["connect", target], timeout=timeout)
+    combined = (out or err).strip()
+    if "connected to" in combined.lower():
+        save_config("last_wifi_endpoint", target)
+        return True, f"Đã kết nối không dây thành công tới {target}!"
+
+    err_msg = combined or f"Không thể kết nối Wi-Fi tới {target}"
+    if check:
+        raise ADBError(err_msg, returncode=code, stdout=out, stderr=err)
     return False, err_msg
 
 

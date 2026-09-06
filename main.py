@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QGridLayout, QLabel, QPushButton, QComboBox, QCheckBox,
     QLineEdit, QTextEdit, QFrame, QFileDialog, QMessageBox,
-    QScrollArea, QSizePolicy
+    QScrollArea, QSizePolicy, QInputDialog
 )
 from PySide6.QtGui import QFont, QCursor, QIcon
 
@@ -145,7 +145,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.8.3")
+        lbl_ver = QLabel("v2.8.4")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -518,7 +518,7 @@ class DroidMasterApp(QMainWindow):
         root_layout.addWidget(self.scroll, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.8.3 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.8.4 sẵn sàng.")
 
     def eventFilter(self, watched, event):
         if hasattr(self, 'scroll') and watched == self.scroll.viewport():
@@ -586,6 +586,8 @@ class DroidMasterApp(QMainWindow):
             self.lbl_status_pill.setText("OFFLINE")
             self.lbl_status_pill.setObjectName("statusPillOffline")
             self.clear_specs()
+            if not getattr(self, "_is_reconnecting_wifi", False):
+                self.try_auto_reconnect_wifi()
         else:
             selected_idx = 0
             for idx, dev in enumerate(self.devices):
@@ -595,6 +597,8 @@ class DroidMasterApp(QMainWindow):
                     selected_idx = idx
                 elif not preferred_serial and self.active_serial and dev["serial"] == self.active_serial:
                     selected_idx = idx
+                if dev.get("type") == "Wi-Fi" or ":" in dev.get("serial", ""):
+                    adb_core.save_config("last_wifi_endpoint", dev["serial"])
 
             self.combo_devices.setCurrentIndex(selected_idx)
             self.active_serial = self.devices[selected_idx]["serial"]
@@ -604,6 +608,26 @@ class DroidMasterApp(QMainWindow):
             self.fetch_telemetry(self.active_serial)
 
         self.combo_devices.blockSignals(False)
+
+    def try_auto_reconnect_wifi(self):
+        last_wifi = adb_core.load_config().get("last_wifi_endpoint")
+        if not last_wifi:
+            return
+        self._is_reconnecting_wifi = True
+        self.log(f"📶 Đang tự động quét & kết nối lại thiết bị Wi-Fi ({last_wifi})...")
+
+        def task():
+            return adb_core.connect_endpoint(last_wifi, timeout=4)
+
+        def on_done(ok, msg):
+            self._is_reconnecting_wifi = False
+            if ok:
+                self.log(f"✅ {msg}")
+                self.reload_devices(preferred_serial=last_wifi)
+            else:
+                self.log(f"ℹ️ Thiết bị Wi-Fi ({last_wifi}) chưa phản hồi.")
+
+        self.run_async(task, on_done)
 
     def on_device_selected(self, idx):
         if idx >= 0 and self.devices:
@@ -700,8 +724,19 @@ class DroidMasterApp(QMainWindow):
                 self.log("🔄 Đồng bộ lại danh sách thiết bị trước khi bật chiếu...")
                 self.reload_devices()
             else:
-                QMessageBox.warning(self, "Chú ý", "Không tìm thấy thiết bị Android nào đang kết nối! Vui lòng kiểm tra cáp USB hoặc Wi-Fi.")
-                return
+                last_wifi = adb_core.load_config().get("last_wifi_endpoint")
+                if last_wifi:
+                    self.log(f"📶 Đang thử kết nối nhanh tới thiết bị Wi-Fi ({last_wifi})...")
+                    ok, msg = adb_core.connect_endpoint(last_wifi, timeout=4)
+                    if ok:
+                        self.log(f"✅ {msg}")
+                        self.reload_devices(preferred_serial=last_wifi)
+                        current_devs = adb_core.list_devices()
+                        current_serials = [d["serial"] for d in current_devs]
+
+                if not self.active_serial or self.active_serial not in current_serials:
+                    QMessageBox.warning(self, "Chú ý", "Không tìm thấy thiết bị Android nào đang kết nối! Vui lòng kiểm tra cáp USB hoặc Wi-Fi.")
+                    return
 
         if not self.active_serial:
             QMessageBox.warning(self, "Chú ý", "Vui lòng kết nối một điện thoại Android trước!")
@@ -829,7 +864,48 @@ class DroidMasterApp(QMainWindow):
 
     def action_connect_wifi(self):
         if not self.active_serial:
-            QMessageBox.warning(self, "Chú ý", "Vui lòng cắm cáp USB để kết nối điện thoại trước!")
+            # Wireless mode without cable: Allow direct IP entry or reconnect to saved endpoint
+            last_endpoint = adb_core.load_config().get("last_wifi_endpoint", "192.168.0.106:5555")
+            default_ip = last_endpoint.split(":")[0] if last_endpoint else "192.168.0.106"
+            ip_val, ok = QInputDialog.getText(
+                self, "Kết Nối Không Dây Wi-Fi (Không Cần Cáp)",
+                "Hiện không có điện thoại cắm cáp USB.\n"
+                "Nhập địa chỉ IP Wi-Fi của điện thoại để kết nối trực tiếp:\n"
+                "(Lưu ý: Điện thoại và máy tính phải bắt chung mạng Wi-Fi)",
+                text=default_ip
+            )
+            if not ok or not ip_val.strip():
+                return
+            target_ip = ip_val.strip()
+            self.log(f"📶 Đang kết nối không dây trực tiếp tới {target_ip}:5555...")
+
+            def direct_task():
+                return adb_core.connect_endpoint(target_ip, timeout=5)
+
+            def on_direct_done(ok_dir, msg_dir):
+                if ok_dir:
+                    self.log(f"✅ {msg_dir}")
+                    endpoint_full = f"{target_ip}:5555" if ":" not in target_ip else target_ip
+                    adb_core.save_config("last_wifi_endpoint", endpoint_full)
+                    self.reload_devices(preferred_serial=endpoint_full)
+                    QMessageBox.information(
+                        self, "Kích Hoạt Wi-Fi Thành Công",
+                        f"🎉 {msg_dir}\n\n"
+                        f"👉 Thiết bị đã sẵn sàng điều khiển hoàn toàn không dây!\n"
+                        f"Bây giờ anh có thể bấm 'BẬT CHIẾU MÀN HÌNH' ngay."
+                    )
+                else:
+                    self.log(f"❌ {msg_dir}")
+                    QMessageBox.warning(
+                        self, "Không Thể Kết Nối Wi-Fi",
+                        f"Không thể kết nối Wi-Fi tới {target_ip}:5555.\n\n"
+                        f"• Chi tiết: {msg_dir}\n\n"
+                        f"👉 Nguyên nhân thường gặp:\n"
+                        f"1. Điện thoại vừa bị khởi động lại (Reboot) nên cổng 5555 bị đóng -> Cần cắm cáp USB 1 lần để mở lại.\n"
+                        f"2. Điện thoại và máy tính chưa bắt chung một mạng Wi-Fi."
+                    )
+
+            self.run_async(direct_task, on_direct_done)
             return
 
         if ":" in self.active_serial:
