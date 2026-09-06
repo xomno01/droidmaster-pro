@@ -1,16 +1,16 @@
-# ⚡ DroidMaster Pro v2.8.1 — Universal Android Control Center (Adaptive Responsive Fix)
+# ⚡ DroidMaster Pro v2.8.2 — Universal Android Control Center (Wireless Auto-Sync)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy hardware accelerated pipeline • Giao diện Responsive Bento Grid 2026 • Kiến trúc Enterprise v2.8.1 (Adaptive Responsive Fix)</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Tự động chuyển đổi kết nối không dây Wi-Fi & Hotplug • Kiến trúc Enterprise v2.8.2</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.8.1%20(Adaptive--Responsive--Fix)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.1" />
+  <img src="https://img.shields.io/badge/Version-v2.8.2%20(Wireless--Auto--Sync)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.2" />
   <img src="https://img.shields.io/badge/Tests-100%25%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 100% Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
@@ -22,9 +22,15 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.1 (Adaptive Responsive Fix)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.2 (Wireless & Hotplug Auto-Sync)
 
-Phiên bản **v2.8.1 (Adaptive Responsive Fix)** giải quyết triệt để lỗi tràn viền phải trên màn hình nhỏ/laptop DPI cao, hoàn thiện trải nghiệm responsive thích ứng động đa màn hình và nâng cấp hệ thống telemetry cùng automation engine:
+Phiên bản **v2.8.2** nâng cấp thông minh cho toàn bộ chu trình chuyển đổi không dây (Wi-Fi Wireless Debugging) và quản lý thiết bị theo thời gian thực (Dynamic Device Hotplug):
+
+* 📶 **Tự Động Di Trú Thiết Bị Khi Rút Cáp USB (Zero-Interruption Wi-Fi Handoff):**
+  Khắc phục lỗi Scrcpy tìm kiếm serial USB cũ (`96469ba4`) sau khi người dùng rút cáp. Khi kích hoạt chế độ Không Dây Wi-Fi, ứng dụng tự động ưu tiên chuyển sang endpoint TCP/IP (`<ip>:5555`). Nếu cáp USB bị rút, hệ thống Scrcpy và giao diện tự động bắt trúng thiết bị Wi-Fi đang hoạt động mà không bị crash hay báo lỗi "device not found".
+
+* ⚡ **Hotplug Detection Thời Gian Thực:**
+  Hệ thống tự động phát hiện thiết bị cắm vào hoặc rút ra khỏi máy tính trong chu kỳ telemetry. Danh sách combobox tự động làm mới, hiển thị rõ icon nhận diện (🔌 USB / 📶 Wi-Fi), tự động phục hồi về thiết bị khả dụng gần nhất.
 
 * 📐 **Responsive Bento Layout (Thích Ứng Đa Độ Phân Giải & Tỉ Lệ Scaling):**
   Tái cấu trúc hệ thống layout của giao diện chính bằng cơ chế `QScrollArea` kết hợp kích thước co giãn linh hoạt (`sizeHint` và dynamic constraint boundaries). Giao diện hiển thị trọn vẹn, không bị che khuất nút bấm hoặc tràn nội dung trên mọi độ phân giải màn hình — từ các dòng laptop nhỏ độ phân giải **1366x768** (với tỉ lệ hiển thị Windows DPI scaling **125% – 150%**) cho đến các màn hình đồ họa độ phân giải cao **4K UHD**.

@@ -486,6 +486,32 @@ class TestADBCore(unittest.TestCase):
             self.assertFalse(res_mismatch["valid"])
             self.assertEqual(res_mismatch["files"]["fake.bin"]["status"], "mismatch")
 
+    def test_launch_scrcpy_smart_fallback(self):
+        """Test that launch_scrcpy automatically falls back to an active Wi-Fi device
+        if the target USB serial was unplugged.
+        """
+        from unittest.mock import patch, MagicMock
+
+        # Mock list_devices returning only the active Wi-Fi device
+        mock_devices = [
+            {"serial": "192.168.0.106:5555", "state": "device", "model": "POCOPHONE F1", "type": "Wi-Fi"}
+        ]
+        with patch("adb_core.os.path.exists", return_value=True):
+            with patch("adb_core.list_devices", return_value=mock_devices):
+                with patch("subprocess.Popen") as mock_popen:
+                    mock_proc = MagicMock()
+                    mock_popen.return_value = mock_proc
+
+                    # Requesting old USB serial '96469ba4' which is now gone
+                    proc = adb_core.launch_scrcpy("96469ba4", {"always_on_top": True})
+                    self.assertIsNotNone(proc)
+
+                    # Verify scrcpy was called with the fallback Wi-Fi serial!
+                    called_cmd = mock_popen.call_args[0][0]
+                    self.assertIn("-s", called_cmd)
+                    serial_idx = called_cmd.index("-s") + 1
+                    self.assertEqual(called_cmd[serial_idx], "192.168.0.106:5555")
+
 
 class TestCyberDroid(unittest.TestCase):
     """Test suite for cyber_droid automation improvements."""

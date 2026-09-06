@@ -478,11 +478,24 @@ def get_device_info(serial: str, dynamic_only: bool = False, refresh_cache: bool
 # ==============================================================================
 
 def launch_scrcpy(serial: str, options: Dict) -> Optional[subprocess.Popen]:
-    """Launch scrcpy with custom user options."""
+    """Launch scrcpy with custom user options.
+    If the specified serial is disconnected (e.g. user unplugged USB cable after enabling Wi-Fi),
+    automatically redirects to the active Wi-Fi or available device.
+    """
     if not os.path.exists(SCRCPY_PATH):
         return None
 
-    cmd = [SCRCPY_PATH, "-s", serial]
+    target_serial = serial
+    try:
+        devs = list_devices()
+        active_serials = [d["serial"] for d in devs if d.get("state") == "device"]
+        if active_serials and target_serial not in active_serials:
+            wifi_serials = [s for s in active_serials if ":" in s]
+            target_serial = wifi_serials[0] if wifi_serials else active_serials[0]
+    except Exception:
+        pass
+
+    cmd = [SCRCPY_PATH, "-s", target_serial]
 
     if options.get("always_on_top", True):
         cmd.append("--always-on-top")
@@ -499,7 +512,7 @@ def launch_scrcpy(serial: str, options: Dict) -> Optional[subprocess.Popen]:
     if bitrate:
         cmd.extend(["--video-bit-rate", str(bitrate)])
 
-    title = options.get("title", f"DroidMaster // {serial}")
+    title = options.get("title", f"DroidMaster // {target_serial}")
     cmd.extend(["--window-title", title])
     cmd.extend(["--window-width", "420"])
 

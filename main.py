@@ -145,7 +145,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.8.1")
+        lbl_ver = QLabel("v2.8.2")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -518,7 +518,7 @@ class DroidMasterApp(QMainWindow):
         root_layout.addWidget(self.scroll, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.8.1 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.8.2 sẵn sàng.")
 
     def eventFilter(self, watched, event):
         if hasattr(self, 'scroll') and watched == self.scroll.viewport():
@@ -574,7 +574,7 @@ class DroidMasterApp(QMainWindow):
         t_str = time.strftime("%H:%M:%S")
         self.txt_log.append(f"[{t_str}] {text}")
 
-    def reload_devices(self):
+    def reload_devices(self, preferred_serial: str = None):
         self.combo_devices.blockSignals(True)
         self.combo_devices.clear()
 
@@ -587,11 +587,18 @@ class DroidMasterApp(QMainWindow):
             self.lbl_status_pill.setObjectName("statusPillOffline")
             self.clear_specs()
         else:
-            for dev in self.devices:
-                self.combo_devices.addItem(f"{dev['model']} ({dev['type']})", dev["serial"])
+            selected_idx = 0
+            for idx, dev in enumerate(self.devices):
+                icon = "📶" if dev.get("type") == "Wi-Fi" else "🔌"
+                self.combo_devices.addItem(f"{icon} {dev['model']} ({dev['type']})", dev["serial"])
+                if preferred_serial and dev["serial"] == preferred_serial:
+                    selected_idx = idx
+                elif not preferred_serial and self.active_serial and dev["serial"] == self.active_serial:
+                    selected_idx = idx
 
-            self.active_serial = self.devices[0]["serial"]
-            self.lbl_device_model.setText(self.devices[0]["model"])
+            self.combo_devices.setCurrentIndex(selected_idx)
+            self.active_serial = self.devices[selected_idx]["serial"]
+            self.lbl_device_model.setText(self.devices[selected_idx]["model"])
             self.lbl_status_pill.setText("ONLINE")
             self.lbl_status_pill.setObjectName("statusPill")
             self.fetch_telemetry(self.active_serial)
@@ -653,7 +660,26 @@ class DroidMasterApp(QMainWindow):
         self.val_cpu.setText(str(cpu_val))
 
     def auto_poll_telemetry(self):
-        if self.active_serial and not self.is_fetching_telemetry:
+        if self.is_fetching_telemetry:
+            return
+
+        # Check for device plug / unplug events dynamically
+        current_devs = adb_core.list_devices()
+        current_serials = [d["serial"] for d in current_devs]
+
+        # 1. Active device was disconnected
+        if self.active_serial and self.active_serial not in current_serials:
+            self.log(f"🔌 Thiết bị {self.active_serial} đã ngắt kết nối.")
+            self.reload_devices()
+            return
+
+        # 2. A new device was connected while offline
+        if not self.active_serial and current_devs:
+            self.log("⚡ Phát hiện thiết bị Android kết nối.")
+            self.reload_devices()
+            return
+
+        if self.active_serial:
             self.fetch_telemetry(self.active_serial)
 
     def clear_specs(self):
@@ -664,6 +690,18 @@ class DroidMasterApp(QMainWindow):
         self.val_cpu.setText("--")
 
     def action_toggle_stream(self):
+        # Refresh and verify device presence before launching Scrcpy
+        current_devs = adb_core.list_devices()
+        current_serials = [d["serial"] for d in current_devs]
+
+        if not self.active_serial or self.active_serial not in current_serials:
+            if current_devs:
+                self.log("🔄 Đồng bộ lại danh sách thiết bị trước khi bật chiếu...")
+                self.reload_devices()
+            else:
+                QMessageBox.warning(self, "Chú ý", "Không tìm thấy thiết bị Android nào đang kết nối! Vui lòng kiểm tra cáp USB hoặc Wi-Fi.")
+                return
+
         if not self.active_serial:
             QMessageBox.warning(self, "Chú ý", "Vui lòng kết nối một điện thoại Android trước!")
             return
@@ -692,9 +730,9 @@ class DroidMasterApp(QMainWindow):
             if self.scrcpy_proc:
                 self.btn_hero_stream.setText("■ DỪNG CHIẾU MÀN HÌNH")
                 self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ef4444, stop:1 #dc2626); color: #ffffff;")
-                self.log(f"🟢 Đã bật chiếu màn hình 60FPS cho {self.lbl_device_model.text()}.")
+                self.log(f"🟢 Đã bật chiếu màn hình cho {self.lbl_device_model.text()} ({self.active_serial}).")
             else:
-                QMessageBox.critical(self, "Lỗi", "Không thể bật Scrcpy. Hãy kiểm tra kết nối cáp USB!")
+                QMessageBox.critical(self, "Lỗi", "Không thể bật Scrcpy. Hãy kiểm tra kết nối thiết bị!")
 
     def monitor_scrcpy_process(self):
         if self.scrcpy_proc != None and self.scrcpy_proc.poll() is not None:
@@ -790,13 +828,27 @@ class DroidMasterApp(QMainWindow):
 
     def action_connect_wifi(self):
         if not self.active_serial:
-            return
-        ip = self.val_ip.text()
-        if not ip or ip == "--":
-            QMessageBox.warning(self, "Chưa có IP", "Chưa phát hiện địa chỉ IP Wi-Fi của máy!")
+            QMessageBox.warning(self, "Chú ý", "Vui lòng cắm cáp USB để kết nối điện thoại trước!")
             return
 
-        self.log(f"📶 Đang chuyển đổi sang kết nối Wi-Fi ({ip}:5555)...")
+        if ":" in self.active_serial:
+            QMessageBox.information(self, "Đã kết nối Wi-Fi", f"Thiết bị đang kết nối qua Wi-Fi ({self.active_serial}) rồi!")
+            return
+
+        ip = self.val_ip.text().strip()
+        if not ip or ip == "--" or ip == "Unknown":
+            try:
+                info = adb_core.get_device_info(self.active_serial, dynamic_only=True)
+                ip = info.get("ip")
+            except Exception:
+                pass
+
+        if not ip or ip == "--" or ip == "Unknown":
+            QMessageBox.warning(self, "Chưa có IP", "Chưa phát hiện địa chỉ IP Wi-Fi của máy! Hãy đảm bảo điện thoại đang kết nối cùng mạng Wi-Fi với máy tính.")
+            return
+
+        wifi_endpoint = f"{ip}:5555"
+        self.log(f"📶 Đang chuyển đổi sang kết nối Wi-Fi ({wifi_endpoint})...")
 
         def task():
             return adb_core.switch_to_wifi(self.active_serial, ip, 5555)
@@ -804,15 +856,18 @@ class DroidMasterApp(QMainWindow):
         def on_done(ok: bool, msg: object):
             msg_str = str(msg)
             if ok:
+                self.log(f"✅ {msg_str}")
+                # Auto-select the Wi-Fi serial endpoint in combo_devices
+                self.reload_devices(preferred_serial=wifi_endpoint)
                 QMessageBox.information(
-                    self, "Thành công",
-                    f"Đã kết nối không dây tới {ip}:5555!\nBây giờ anh có thể RÚT DÂY CÁP USB ra mà vẫn điều khiển bình thường."
+                    self, "Kích Hoạt Wi-Fi Thành Công",
+                    f"🎉 Đã kết nối không dây tới {wifi_endpoint}!\n\n"
+                    f"👉 Bây giờ anh có thể RÚT DÂY CÁP USB ra.\n"
+                    f"Ứng dụng đã tự động chuyển sang điều khiển qua Wi-Fi ({wifi_endpoint})."
                 )
-                self.reload_devices()
             else:
-                QMessageBox.warning(self, "Lỗi kết nối", msg_str)
-
-        self.run_async(task, on_done)
+                self.log(f"❌ {msg_str}")
+                QMessageBox.warning(self, "Lỗi kết nối Wi-Fi", msg_str)
 
     def action_run_bot(self):
         # Emergency stop toggle
