@@ -7,6 +7,13 @@ Target: Connected Android Subsystem // ADB Protocol Bridge
 
 import os
 import sys
+if sys.platform == "win32":
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
 import time
 import subprocess
 import re
@@ -19,6 +26,9 @@ from typing import List, Dict, Optional, Tuple
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 if CURRENT_DIR not in sys.path:
     sys.path.insert(0, CURRENT_DIR)
+_sub = os.path.join(CURRENT_DIR, "droid_master")
+if os.path.isdir(_sub) and _sub not in sys.path:
+    sys.path.insert(0, _sub)
 
 from rich.console import Console
 from rich.panel import Panel
@@ -37,6 +47,7 @@ from adb_core import (
     reboot,
     switch_to_wifi,
     launch_scrcpy,
+    parse_ui_hierarchy,
 )
 
 console = Console()
@@ -358,10 +369,34 @@ def cmd_tap_id(target_arg: str, serial: Optional[str] = None):
         run_adb_raw(["shell", "input", "tap", str(cx), str(cy)], serial=active)
 
     desc_str = target_elem["text"] or target_elem["desc"] or target_elem["short_id"] or target_elem["type"]
-    console.print(f"[bold bright_green][✓] Tapped Element #{target_elem.get('index', '?')} [{target_elem['type']}: {desc_str}] at ({cx}, {cy})[/]")
+    console.print(f"[bold bright_green][+] Tapped Element #{target_elem.get('index', '?')} [{target_elem['type']}: {desc_str}] at ({cx}, {cy})[/]")
 
-def cmd_tap_text(query: str, serial: Optional[str] = None):
-    """Click an element discovered by recon using its text or content description."""
+def find_element_by_text(query: str, elements: List[Dict]) -> Optional[Dict]:
+    """Find matching UI element by exact text/desc, substring text/desc, or resource ID."""
+    q = query.strip().lower()
+    # 1. Exact match in text or desc
+    for elem in elements:
+        if elem.get("text", "").lower() == q or elem.get("desc", "").lower() == q:
+            return elem
+
+    # 2. Substring match in text or desc
+    for elem in elements:
+        if q in elem.get("text", "").lower() or q in elem.get("desc", "").lower():
+            return elem
+
+    # 3. Substring match in resource ID / short ID
+    for elem in elements:
+        if q in elem.get("short_id", "").lower() or q in elem.get("resource_id", "").lower():
+            return elem
+
+    return None
+
+
+def cmd_tap_text(query: str, serial: Optional[str] = None) -> bool:
+    """Click an element discovered by recon using its text or content description.
+    If the target is not found in the current cache, automatically triggers recon()
+    to refresh the UI hierarchy from the device and retries before reporting an error.
+    """
     global RECON_ELEMENTS
     active = serial or get_active_serial()
 
@@ -369,39 +404,34 @@ def cmd_tap_text(query: str, serial: Optional[str] = None):
         console.print("[yellow][*] No cached UI elements. Running recon scan first...[/]")
         cmd_recon(active)
         if not RECON_ELEMENTS:
-            return
+            console.print("[red][!] Could not retrieve UI hierarchy from device.[/]")
+            return False
 
-    q = query.strip().lower()
-    matches = []
+    # Search in current cache
+    target = find_element_by_text(query, RECON_ELEMENTS)
 
-    # 1. Exact match in text or desc
-    for elem in RECON_ELEMENTS:
-        if elem["text"].lower() == q or elem["desc"].lower() == q:
-            matches.append(elem)
+    # If not found in current cache, auto-trigger recon() to refresh screen hierarchy
+    if not target:
+        console.print(f"[yellow][*] Target '{query}' not found in current UI cache. Triggering auto-recon refresh...[/]")
+        cmd_recon(active)
+        target = find_element_by_text(query, RECON_ELEMENTS)
 
-    # 2. Substring match in text or desc
-    if not matches:
-        for elem in RECON_ELEMENTS:
-            if q in elem["text"].lower() or q in elem["desc"].lower():
-                matches.append(elem)
+    if not target:
+        console.print(f"[red][!] No element found matching text query '{query}' after screen recon refresh. Run 'recon' to inspect available UI elements.[/]")
+        return False
 
-    # 3. Substring match in resource ID
-    if not matches:
-        for elem in RECON_ELEMENTS:
-            if q in elem["short_id"].lower():
-                matches.append(elem)
-
-    if not matches:
-        console.print(f"[red][!] No element found matching text query '{query}'. Run 'recon' to inspect available UI elements.[/]")
-        return
-
-    target = matches[0]
     cx, cy = target["center"]
     with console.status(f"[bold green]DISPATCHING INPUT TAP AT ({cx}, {cy})...[/]"):
         run_adb_raw(["shell", "input", "tap", str(cx), str(cy)], serial=active)
 
-    desc_str = target["text"] or target["desc"] or target["short_id"] or target["type"]
-    console.print(f"[bold bright_green][✓] Matched element #{target.get('index', '?')} ('{desc_str}') -> Tapped at ({cx}, {cy})[/]")
+    desc_str = target.get("text") or target.get("desc") or target.get("short_id") or target.get("type")
+    console.print(f"[bold bright_green][+] Matched element #{target.get('index', '?')} ('{desc_str}') -> Tapped at ({cx}, {cy})[/]")
+    return True
+
+
+# Programmatic aliases
+tap_text = cmd_tap_text
+recon = cmd_recon
 
 def cmd_scrcpy(serial: Optional[str] = None):
     """Deploy hardware-accelerated screen mirror via adb_core.launch_scrcpy."""
@@ -533,10 +563,10 @@ def main_loop():
                     target = args[0]
                     if target.isdigit() and 1 <= int(target) <= len(devs):
                         CURRENT_SERIAL = devs[int(target) - 1]["serial"]
-                        console.print(f"[bold bright_green][✓] Target switched to: {CURRENT_SERIAL}[/]")
+                        console.print(f"[bold bright_green][+] Target switched to: {CURRENT_SERIAL}[/]")
                     else:
                         CURRENT_SERIAL = target
-                        console.print(f"[bold bright_green][✓] Target serial configured: {CURRENT_SERIAL}[/]")
+                        console.print(f"[bold bright_green][+] Target serial configured: {CURRENT_SERIAL}[/]")
 
             elif cmd == "tap":
                 if len(args) < 2:
@@ -545,7 +575,7 @@ def main_loop():
                     x, y = args[0], args[1]
                     with console.status(f"[bold green]DISPATCHING INPUT TAP AT ({x}, {y})...[/]"):
                         run_adb_raw(["shell", "input", "tap", x, y], serial=get_active_serial())
-                    console.print(f"[bold bright_green][✓] Input tap event dispatched at ({x}, {y}).[/]")
+                    console.print(f"[bold bright_green][+] Input tap event dispatched at ({x}, {y}).[/]")
 
             elif cmd == "swipe":
                 if not args:
@@ -561,7 +591,7 @@ def main_loop():
                     if direction in dirs:
                         x1, y1, x2, y2 = dirs[direction]
                         run_adb_raw(["shell", "input", "swipe", x1, y1, x2, y2, "300"], serial=get_active_serial())
-                        console.print(f"[bold bright_green][✓] Gesture event executed: SWIPE_{direction.upper()}[/]")
+                        console.print(f"[bold bright_green][+] Gesture event executed: SWIPE_{direction.upper()}[/]")
                     else:
                         console.print("[red][!] Hướng vuốt không hợp lệ: up, down, left, right[/]")
 
@@ -571,7 +601,7 @@ def main_loop():
                 else:
                     text_input = " ".join(args)
                     send_text(get_active_serial() or "", text_input)
-                    console.print(f"[bold bright_green][✓] Dispatched text input: {text_input}[/]")
+                    console.print(f"[bold bright_green][+] Dispatched text input: {text_input}[/]")
 
             elif cmd == "key":
                 if not args:
@@ -589,14 +619,14 @@ def main_loop():
                     k = args[0].lower()
                     keycode = keymap.get(k, k)
                     send_keyevent(get_active_serial() or "", keycode)
-                    console.print(f"[bold bright_green][✓] Hardware key event dispatched: KEY_{k.upper()} (Code {keycode})[/]")
+                    console.print(f"[bold bright_green][+] Hardware key event dispatched: KEY_{k.upper()} (Code {keycode})[/]")
 
             elif cmd in ["snap", "screenshot"]:
                 filename = args[0] if args else f"screenshot_{int(time.time())}.png"
                 with console.status(f"[bold cyan]CAPTURING SCREEN BUFFER TO {filename}..."):
                     ok = take_screenshot(get_active_serial() or "", filename)
                 if ok:
-                    console.print(f"[bold bright_green][✓] Screenshot saved to: {os.path.abspath(filename)}[/]")
+                    console.print(f"[bold bright_green][+] Screenshot saved to: {os.path.abspath(filename)}[/]")
                 else:
                     console.print("[red][!] Failed to capture screenshot.[/]")
 
@@ -617,7 +647,7 @@ def main_loop():
                     pkg = shortcuts.get(pkg.lower(), pkg)
                     with console.status(f"[bold green]LAUNCHING APPLICATION INTENT: {pkg}...[/]"):
                         run_adb_raw(["shell", "monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1"], serial=get_active_serial())
-                    console.print(f"[bold bright_green][✓] Application {pkg} launched successfully.[/]")
+                    console.print(f"[bold bright_green][+] Application {pkg} launched successfully.[/]")
 
             elif cmd == "kill":
                 if not args:
@@ -625,7 +655,7 @@ def main_loop():
                 else:
                     pkg = args[0]
                     run_adb_raw(["shell", "am", "force-stop", pkg], serial=get_active_serial())
-                    console.print(f"[bold red][✓] Application process {pkg} terminated.[/]")
+                    console.print(f"[bold red][+] Application process {pkg} terminated.[/]")
 
             elif cmd == "untether":
                 console.print("[bold yellow][*] CONFIGURING WIRELESS TCP/IP ADB LINK...[/]")
@@ -636,7 +666,7 @@ def main_loop():
                 else:
                     ok, msg = switch_to_wifi(get_active_serial() or "", ip, port=5555)
                     if ok:
-                        console.print(f"[bold bright_green][✓] WIRELESS PROTOCOL ESTABLISHED: {msg}[/]")
+                        console.print(f"[bold bright_green][+] WIRELESS PROTOCOL ESTABLISHED: {msg}[/]")
                         console.print("[bold bright_cyan][+] Anh có thể rút dây cáp USB ra ngay bây giờ! Máy tính vẫn điều khiển điện thoại qua Wi-Fi 100%.[/]")
                     else:
                         console.print(f"[red][!] Lỗi kết nối không dây: {msg}[/]")

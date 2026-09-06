@@ -69,6 +69,11 @@ class DroidMasterApp(QMainWindow):
         self.timer.timeout.connect(self.auto_poll_telemetry)
         self.timer.start(6000)
 
+        # Scrcpy process monitor timer (every 1 second)
+        self.scrcpy_monitor_timer = QTimer(self)
+        self.scrcpy_monitor_timer.timeout.connect(self.monitor_scrcpy_process)
+        self.scrcpy_monitor_timer.start(1000)
+
     def build_ui(self):
         central = QWidget()
         root_layout = QHBoxLayout(central)
@@ -464,7 +469,7 @@ class DroidMasterApp(QMainWindow):
             self.lbl_device_model.setText(self.devices[0]["model"])
             self.lbl_status_pill.setText("ONLINE")
             self.lbl_status_pill.setObjectName("statusPill")
-            self.fetch_telemetry()
+            self.fetch_telemetry(self.active_serial)
 
         self.combo_devices.blockSignals(False)
 
@@ -472,7 +477,7 @@ class DroidMasterApp(QMainWindow):
         if idx >= 0 and self.devices:
             self.active_serial = self.combo_devices.currentData()
             self.lbl_device_model.setText(self.devices[idx]["model"])
-            self.fetch_telemetry()
+            self.fetch_telemetry(self.active_serial)
 
     def run_async(self, fn, callback, *args, **kwargs):
         worker = AsyncWorker(fn, *args, **kwargs)
@@ -487,19 +492,25 @@ class DroidMasterApp(QMainWindow):
         worker.finished.connect(on_finished)
         worker.start()
 
-    def fetch_telemetry(self):
-        if not self.active_serial or self.is_fetching_telemetry:
+    def fetch_telemetry(self, target_serial: str = None):
+        target = target_serial or self.active_serial
+        if not target:
+            return
+        if self.is_fetching_telemetry and target == getattr(self, "_current_fetching_serial", None):
             return
 
         self.is_fetching_telemetry = True
+        self._current_fetching_serial = target
 
         def task():
-            return adb_core.get_device_info(self.active_serial)
+            return adb_core.get_device_info(target)
 
-        self.run_async(task, self._render_telemetry)
+        self.run_async(task, lambda ok, res: self._render_telemetry(ok, res, target))
 
-    def _render_telemetry(self, ok: bool, res_data: object):
+    def _render_telemetry(self, ok: bool, res_data: object, target_serial: str = None):
         self.is_fetching_telemetry = False
+        if target_serial != self.active_serial:
+            return
         if not ok or not self.active_serial:
             return
         info = res_data if isinstance(res_data, dict) else {}
@@ -516,7 +527,7 @@ class DroidMasterApp(QMainWindow):
 
     def auto_poll_telemetry(self):
         if self.active_serial and not self.is_fetching_telemetry:
-            self.fetch_telemetry()
+            self.fetch_telemetry(self.active_serial)
 
     def clear_specs(self):
         self.val_battery.setText("--")
@@ -556,6 +567,13 @@ class DroidMasterApp(QMainWindow):
                 self.log(f"🟢 Đã bật chiếu màn hình 60FPS cho {self.lbl_device_model.text()}.")
             else:
                 QMessageBox.critical(self, "Lỗi", "Không thể bật Scrcpy. Hãy kiểm tra kết nối cáp USB!")
+
+    def monitor_scrcpy_process(self):
+        if self.scrcpy_proc != None and self.scrcpy_proc.poll() is not None:
+            self.scrcpy_proc = None
+            self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
+            self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
+            self.log("⏹️ Cửa sổ chiếu màn hình Scrcpy đã đóng.")
 
     def send_key(self, code):
         if not self.active_serial:

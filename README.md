@@ -5,7 +5,7 @@
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Zero Latency • Giao diện Bento Grid 2026 • Kiến trúc Enterprise v2.6.0</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ cực thấp (Low Latency) tối ưu bởi Scrcpy pipeline • Giao diện Bento Grid 2026 • Kiến trúc Enterprise v2.6.0</em>
 </p>
 
 <p align="center">
@@ -33,11 +33,11 @@ Phiên bản **v2.6.0 (Enterprise Refactor)** đại tu toàn bộ nền tảng 
 * ⚡ **Memory-Stream Screenshot Pipeline (`exec-out screencap -p`):**
   Chụp ảnh màn hình trực tiếp từ RAM thiết bị Android bằng binary streaming qua `adb exec-out screencap -p`, loại bỏ hoàn toàn việc ghi file đĩa tạm trên thiết bị Android hoặc máy tính. Dữ liệu nhị phân PNG được nạp thẳng vào `QPixmap` trong bộ nhớ, hạ độ trễ chụp ảnh xuống mức mili-giây và loại bỏ hoàn toàn sự phụ thuộc vào thư viện bên thứ ba như Pillow.
 
-* 🇻🇳 **Native Vietnamese Unicode Input Support (Android Clipboard Sync):**
-  Khắc phục triệt để nhược điểm của lệnh `adb shell input text` truyền thống (thường bị nuốt ký tự hoặc vỡ font tiếng Việt có dấu). Cơ chế đồng bộ Clipboard thông minh chuyển đổi chuỗi tiếng Việt Unicode nguyên vẹn sang clipboard hệ thống Android và dán trực tiếp vào trường nhập liệu.
+* 🇻🇳 **Hỗ trợ nhập liệu tiếng Việt qua Android Clipboard Synchronization (cmd clipboard / PASTE keyevent):**
+  Khắc phục triệt để nhược điểm của lệnh `adb shell input text` truyền thống (thường bị nuốt ký tự hoặc vỡ font tiếng Việt có dấu). Cơ chế đồng bộ Clipboard thông minh chuyển đổi chuỗi tiếng Việt Unicode nguyên vẹn sang clipboard hệ thống Android (`cmd clipboard set text`) và kích hoạt sự kiện dán (`input keyevent 279` / PASTE keyevent) trực tiếp vào trường nhập liệu.
 
-* 📉 **Single-Shot Batched Telemetry Queries (5x Lower CPU Footprint):**
-  Tối ưu hóa chu kỳ giám sát thiết bị thời gian thực: gom các lệnh đọc thông tin (Pin, Nhiệt độ, CPU, Màn hình, Wi-Fi IP) vào một phiên shell batch đơn lẻ. Giảm hơn 80% số lượng subprocess ADB được tạo ra, giảm tải CPU tiêu thụ tới **5 lần** so với phiên bản trước.
+* 📉 **Single-Shot Batched Telemetry Queries (Giảm subprocess overhead):**
+  Tối ưu hóa chu kỳ giám sát thiết bị thời gian thực: gom các lệnh đọc thông tin (Pin, Nhiệt độ, CPU, Màn hình, Wi-Fi IP) vào một phiên shell batch đơn lẻ. Giảm hơn 80% số lần spawn subprocess ADB qua kỹ thuật single-shot batched query so với phiên bản trước.
 
 * 🔍 **UIAutomator XML Semantic Recon Engine:**
   Tích hợp engine trinh sát ngữ cảnh giao diện dựa trên phân tích cấu trúc XML qua UIAutomator. Cho phép nhận diện và tương tác với các thành phần UI (View elements) theo `resource-id`, `text`, hoặc `content-desc` mà không bị ràng buộc bởi tọa độ điểm ảnh cố định, thích ứng hoàn hảo với mọi độ phân giải màn hình.
@@ -46,7 +46,7 @@ Phiên bản **v2.6.0 (Enterprise Refactor)** đại tu toàn bộ nền tảng 
 
 ## 🌟 Giới Thiệu / Overview
 
-**DroidMaster Pro** là phần mềm máy tính (Native Desktop App) chuyên nghiệp, siêu nhẹ, hỗ trợ nhận diện và điều khiển **tất cả mọi dòng điện thoại Android** thông qua giao thức ADB và bộ mã hóa phần cứng Scrcpy. 
+**DroidMaster Pro** là phần mềm máy tính (Native Desktop App) chuyên nghiệp, siêu nhẹ. Hỗ trợ các thiết bị Android tương thích với giao thức ADB/Scrcpy thông qua bộ mã hóa phần cứng Scrcpy. 
 
 Phần mềm được thiết kế theo xu hướng thẩm mỹ **Bento Grid & Dark Obsidian 2026** (lấy cảm hứng từ Linear, Raycast và macOS), mang lại trải nghiệm làm việc trực quan, thoáng đãng và mượt mà tối đa.
 
@@ -55,13 +55,13 @@ Phần mềm được thiết kế theo xu hướng thẩm mỹ **Bento Grid & D
 ## ✨ Tính Năng Nổi Bật / Key Features
 
 ### 1. 🖥️ Chiếu Màn Hình 60FPS Siêu Nhẹ (Scrcpy Pro Hub)
-* **Tốc độ 60 FPS, độ trễ ~0ms:** Giải mã trực tiếp bằng GPU phần cứng, chiếm **< 1% CPU** và chỉ **~25MB RAM**.
+* **Tốc độ 60 FPS, độ trễ cực thấp (Low Latency) tối ưu bởi Scrcpy pipeline:** Giải mã trực tiếp bằng GPU phần cứng, chiếm **< 1% CPU** và chỉ **~25MB RAM**.
 * **Tắt màn hình điện thoại:** Màn hình vật lý của điện thoại tắt đen ngòm để chống nóng máy và bảo vệ pin, trong khi màn hình máy tính vẫn hiển thị và điều khiển chuột/phím bình thường.
 * **Luôn ghim trên cùng (Always on Top):** Cửa sổ điện thoại luôn nổi cạnh các phần mềm đang làm việc.
 * **Tùy chỉnh độ phân giải:** Full HD+ (1080p), 720p (siêu nhẹ cho máy yếu) hoặc gốc.
 
 ### 2. 📱 Quản Lý Đa Thiết Bị (Multi-Device Auto Detect)
-* Tự động quét và nhận diện mọi điện thoại Android cắm qua cáp USB hoặc mạng Wi-Fi.
+* Tự động quét và nhận diện các thiết bị Android tương thích với giao thức ADB/Scrcpy cắm qua cáp USB hoặc mạng Wi-Fi.
 * Hỗ trợ thanh Dropdown chuyển đổi điều khiển giữa nhiều máy nhanh chóng.
 * **Bảng thông số Telemetry thời gian thực:** Model, Android OS, Mức Pin, Nhiệt độ phần cứng, Độ phân giải, Địa chỉ IP (Single-shot batched query siêu nhẹ).
 
@@ -73,7 +73,7 @@ Phần mềm được thiết kế theo xu hướng thẩm mỹ **Bento Grid & D
   * `🔔 Hạ thanh thông báo (Notification Shade)`
   * `🔒 Bật / Khóa nguồn (Power)`
   * `🔉 / 🔊 Tăng giảm âm lượng`
-* **Gõ chữ xuyên nền tảng (Text Injector):** Hỗ trợ gõ tiếng Việt Unicode đầy đủ dấu và biểu tượng cảm xúc thông qua Clipboard Sync tốc độ cao.
+* **Gõ chữ xuyên nền tảng (Text Injector):** Hỗ trợ nhập liệu tiếng Việt qua Android Clipboard Synchronization (cmd clipboard / PASTE keyevent), đảm bảo đầy đủ dấu tiếng Việt và biểu tượng cảm xúc.
 
 ### 4. 🛠️ Hộp Công Cụ Bento (Quick Toolbox)
 * 📸 **Chụp Màn Hình:** Bấm 1 nút lưu ngay ảnh HD vào thư mục `Pictures/DroidMaster` trên PC và tự mở ảnh (Memory stream pipeline).
@@ -140,6 +140,7 @@ droidmaster-pro/
 ├── app_icon.ico           # Biểu tượng phần mềm sấm sét neon
 ├── run_droid_master.bat   # Script khởi chạy tự động dò tìm Python & bắt lỗi
 ├── requirements.txt       # Danh sách thư viện Python (PySide6, rich - Zero Pillow)
+├── SECURITY.md            # Chính sách bảo mật, ADB trust boundary & checksum verification
 └── README.md              # Tài liệu hướng dẫn & kiến trúc hệ thống
 ```
 
@@ -147,9 +148,18 @@ droidmaster-pro/
 
 ## 🛡️ Yêu Cầu Thiết Bị Android / Requirements
 
-* Bất kỳ điện thoại Android nào chạy **Android 5.0 trở lên**.
+* Hỗ trợ các thiết bị Android tương thích với giao thức ADB/Scrcpy (chạy Android 5.0 trở lên).
 * Đã bật **Gỡ lỗi USB (USB Debugging)** trong phần *Tùy chọn cho nhà phát triển*.
 * **KHÔNG CẦN ROOT:** Toàn bộ tính năng đều chạy qua giao thức chuẩn của Android.
+
+---
+
+## 🔒 Bảo Mật & Ranh Giới Tin Cậy / Security
+
+Vui lòng tham khảo chi tiết tại [SECURITY.md](file:///C:/Users/phamn/.gemini/antigravity/scratch/droid_master/SECURITY.md) để nắm rõ:
+* Chính sách báo cáo lỗ hổng bảo mật.
+* Mô hình ranh giới tin cậy (ADB Trust Boundary & Host-to-Device permissions).
+* Bảng mã băm SHA-256 đối soát tính toàn vẹn nhị phân trong thư mục `bin/`.
 
 ---
 
