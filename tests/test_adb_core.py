@@ -455,6 +455,17 @@ class TestADBCore(unittest.TestCase):
             self.assertTrue(ok)
             self.assertIn("10.0.0.5:5555", msg)
 
+    def test_connect_wifi_already_connected(self):
+        """Test connect_wifi and switch_to_wifi when device reports already connected."""
+        with patch("adb_core.run_adb_raw") as mock_run:
+            mock_run.side_effect = [
+                (0, "restarting in TCP mode port: 5555", ""),
+                (0, "already connected to 192.168.1.100:5555", ""),
+            ]
+            ok, msg = switch_to_wifi("mock_device", "192.168.1.100", 5555)
+            self.assertTrue(ok)
+            self.assertIn("192.168.1.100:5555", msg)
+
     def test_verify_binary_manifest_real_and_mock(self):
         """Test verify_binary_manifest on actual bin/manifest.json and edge cases."""
         import tempfile

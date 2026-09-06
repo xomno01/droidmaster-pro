@@ -1,17 +1,17 @@
-# ⚡ DroidMaster Pro v2.8.2 — Universal Android Control Center (Wireless Auto-Sync)
+# ⚡ DroidMaster Pro v2.8.3 — Universal Android Control Center (Seamless Wi-Fi Handoff)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Tự động chuyển đổi kết nối không dây Wi-Fi & Hotplug • Kiến trúc Enterprise v2.8.2</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Tự động chuyển đổi kết nối không dây Wi-Fi & Hotplug • Kiến trúc Enterprise v2.8.3</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.8.2%20(Wireless--Auto--Sync)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.2" />
-  <img src="https://img.shields.io/badge/Tests-100%25%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 100% Passing" />
+  <img src="https://img.shields.io/badge/Version-v2.8.3%20(Seamless--Wi--Fi--Handoff)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.3" />
+  <img src="https://img.shields.io/badge/Tests-16%2F16%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 16/16 Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
   <img src="https://img.shields.io/badge/Mirror-Scrcpy%204.1-FF6B6B?style=for-the-badge" alt="Scrcpy 4.1" />
@@ -22,12 +22,18 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.2 (Wireless & Hotplug Auto-Sync)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.3 (Seamless Wi-Fi Handoff)
 
-Phiên bản **v2.8.2** nâng cấp thông minh cho toàn bộ chu trình chuyển đổi không dây (Wi-Fi Wireless Debugging) và quản lý thiết bị theo thời gian thực (Dynamic Device Hotplug):
+Phiên bản **v2.8.3** hoàn thiện triệt để đường ống điều khiển không dây Wi-Fi và cơ chế luồng bất đồng bộ:
 
-* 📶 **Tự Động Di Trú Thiết Bị Khi Rút Cáp USB (Zero-Interruption Wi-Fi Handoff):**
-  Khắc phục lỗi Scrcpy tìm kiếm serial USB cũ (`96469ba4`) sau khi người dùng rút cáp. Khi kích hoạt chế độ Không Dây Wi-Fi, ứng dụng tự động ưu tiên chuyển sang endpoint TCP/IP (`<ip>:5555`). Nếu cáp USB bị rút, hệ thống Scrcpy và giao diện tự động bắt trúng thiết bị Wi-Fi đang hoạt động mà không bị crash hay báo lỗi "device not found".
+* 📶 **Kích Hoạt Wi-Fi Bất Đồng Bộ & Tự Động Chuyển Thiết Bị Tức Thì:**
+  Khắc phục hoàn toàn lỗi nút "Bật kết nối Wi-Fi" không phản hồi khi bấm do thiếu lệnh dispatch luồng. Bổ sung cơ chế phát hiện thông minh: nếu thiết bị đã được kết nối Wi-Fi trước đó (`<ip>:5555`), ứng dụng lập tức nhận diện và tự động chuyển đổi danh sách thiết bị đang hoạt động sang Wi-Fi trong 0ms. Nếu là phiên kết nối mới, lệnh chuyển đổi chạy hoàn toàn trên nền `AsyncWorker` ngầm mà không gây đơ/treo giao diện.
+
+* 🔌 **Rút Cáp USB An Toàn — Tiếp Tục Chiếu Màn Hình Không Gián Đoạn:**
+  Khi chuyển đổi Wi-Fi thành công, ứng dụng hiển thị hộp thoại hướng dẫn người dùng rút cáp USB an toàn. Cửa sổ chiếu màn hình Scrcpy và bộ phím điều khiển từ xa tự động bám theo endpoint Wi-Fi, không bao giờ rơi vào trạng thái "device not found".
+
+* 🧪 **Bộ Kiểm Thử Mở Rộng Lên 16 Unit Tests (100% Pass):**
+  Bổ sung các bài kiểm tra chuyên sâu cho luồng kết nối Wi-Fi tự động, xử lý trường hợp thiết bị đã kết nối sẵn, tái kết nối thông minh và ủy quyền lệnh `switch_to_wifi`.
 
 * ⚡ **Hotplug Detection Thời Gian Thực:**
   Hệ thống tự động phát hiện thiết bị cắm vào hoặc rút ra khỏi máy tính trong chu kỳ telemetry. Danh sách combobox tự động làm mới, hiển thị rõ icon nhận diện (🔌 USB / 📶 Wi-Fi), tự động phục hồi về thiết bị khả dụng gần nhất.

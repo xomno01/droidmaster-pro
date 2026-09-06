@@ -145,7 +145,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.8.2")
+        lbl_ver = QLabel("v2.8.3")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -518,7 +518,7 @@ class DroidMasterApp(QMainWindow):
         root_layout.addWidget(self.scroll, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.8.2 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.8.3 sẵn sàng.")
 
     def eventFilter(self, watched, event):
         if hasattr(self, 'scroll') and watched == self.scroll.viewport():
@@ -617,6 +617,7 @@ class DroidMasterApp(QMainWindow):
         def on_finished(ok: bool, res: object):
             if worker in self.workers:
                 self.workers.remove(worker)
+            worker.deleteLater()
             try:
                 callback(ok, res)
             except Exception as e:
@@ -835,39 +836,58 @@ class DroidMasterApp(QMainWindow):
             QMessageBox.information(self, "Đã kết nối Wi-Fi", f"Thiết bị đang kết nối qua Wi-Fi ({self.active_serial}) rồi!")
             return
 
-        ip = self.val_ip.text().strip()
-        if not ip or ip == "--" or ip == "Unknown":
-            try:
-                info = adb_core.get_device_info(self.active_serial, dynamic_only=True)
-                ip = info.get("ip")
-            except Exception:
-                pass
+        # Check if this device already has an active Wi-Fi connection in devices list
+        current_serials = [d["serial"] for d in self.devices]
+        existing_wifi = None
+        for dev in self.devices:
+            s = dev.get("serial", "")
+            if (dev.get("type") == "Wi-Fi" or ":" in s) and (s in current_serials):
+                existing_wifi = s
+                break
 
-        if not ip or ip == "--" or ip == "Unknown":
-            QMessageBox.warning(self, "Chưa có IP", "Chưa phát hiện địa chỉ IP Wi-Fi của máy! Hãy đảm bảo điện thoại đang kết nối cùng mạng Wi-Fi với máy tính.")
+        if existing_wifi:
+            self.log(f"📶 Thiết bị đã kết nối sẵn qua Wi-Fi ({existing_wifi}). Đang chuyển sang điều khiển không dây...")
+            self.reload_devices(preferred_serial=existing_wifi)
+            QMessageBox.information(
+                self, "Kích Hoạt Wi-Fi Thành Công",
+                f"🎉 Thiết bị đã kết nối sẵn qua Wi-Fi ({existing_wifi})!\n\n"
+                f"👉 Ứng dụng đã tự động chuyển sang điều khiển qua Wi-Fi ({existing_wifi}).\n"
+                f"Bây giờ anh có thể RÚT DÂY CÁP USB ra và bấm 'BẬT CHIẾU MÀN HÌNH'."
+            )
             return
 
-        wifi_endpoint = f"{ip}:5555"
-        self.log(f"📶 Đang chuyển đổi sang kết nối Wi-Fi ({wifi_endpoint})...")
+        ip = self.val_ip.text().strip()
+        ip_param = ip if (ip and ip != "--" and ip != "Unknown") else None
+        target_serial = self.active_serial
+        target_label = f"({ip_param}:5555)" if ip_param else ""
+        self.log(f"📶 Đang chuyển đổi sang kết nối Wi-Fi {target_label}...")
 
         def task():
-            return adb_core.switch_to_wifi(self.active_serial, ip, 5555)
+            return adb_core.connect_wifi(target_serial, ip=ip_param, port=5555)
 
         def on_done(ok: bool, msg: object):
             msg_str = str(msg)
             if ok:
                 self.log(f"✅ {msg_str}")
                 # Auto-select the Wi-Fi serial endpoint in combo_devices
-                self.reload_devices(preferred_serial=wifi_endpoint)
+                devs = adb_core.list_devices()
+                wifi_serial = None
+                for d in devs:
+                    if ":" in d.get("serial", ""):
+                        wifi_serial = d["serial"]
+                        break
+                self.reload_devices(preferred_serial=wifi_serial)
                 QMessageBox.information(
                     self, "Kích Hoạt Wi-Fi Thành Công",
-                    f"🎉 Đã kết nối không dây tới {wifi_endpoint}!\n\n"
-                    f"👉 Bây giờ anh có thể RÚT DÂY CÁP USB ra.\n"
-                    f"Ứng dụng đã tự động chuyển sang điều khiển qua Wi-Fi ({wifi_endpoint})."
+                    f"🎉 {msg_str}\n\n"
+                    f"👉 Bây giờ anh có thể RÚT DÂY CÁP USB ra an toàn.\n"
+                    f"Ứng dụng đã tự động chuyển sang điều khiển qua Wi-Fi ({self.active_serial})."
                 )
             else:
                 self.log(f"❌ {msg_str}")
                 QMessageBox.warning(self, "Lỗi kết nối Wi-Fi", msg_str)
+
+        self.run_async(task, on_done)
 
     def action_run_bot(self):
         # Emergency stop toggle
