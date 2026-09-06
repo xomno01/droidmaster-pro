@@ -1,18 +1,34 @@
-﻿# Byte-compiled / optimized
+# Byte-compiled / optimized
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Temporary / Log files
+*.log
+*.tmp
+*.bak
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+htmlcov/
 
 # PyInstaller / Packaging
 build/
 dist/
 *.spec
 *.zip
+*.egg-info/
 
-# Virtual Environment
+# Virtual Environments
 venv/
 .venv/
 env/
+
+# Application Generated / Screenshots
+screenshots/
+Pictures/
+captures/
 
 # IDE / Editor files
 .idea/
@@ -20,8 +36,10 @@ env/
 *.sublime-project
 *.sublime-workspace
 *.swp
+*.swo
 
 # OS generated
+.DS_Store
 Thumbs.db
 ehthumbs.db
 Desktop.ini

@@ -18,13 +18,13 @@ from PySide6.QtWidgets import (
     QLineEdit, QTextEdit, QFrame, QFileDialog, QMessageBox,
     QScrollArea, QSizePolicy
 )
-from PySide6.QtGui import QFont, QCursor
+from PySide6.QtGui import QFont, QCursor, QIcon
 
 import adb_core
 from styles import DARK_THEME_QSS
 
 class AsyncWorker(QThread):
-    finished = Signal(bool, str)
+    finished = Signal(bool, object)
 
     def __init__(self, fn, *args, **kwargs):
         super().__init__()
@@ -36,9 +36,11 @@ class AsyncWorker(QThread):
         try:
             res = self.fn(*self.args, **self.kwargs)
             if isinstance(res, tuple) and len(res) == 2:
-                self.finished.emit(res[0], str(res[1]))
+                self.finished.emit(bool(res[0]), res[1])
+            elif isinstance(res, bool):
+                self.finished.emit(res, res)
             else:
-                self.finished.emit(True, str(res))
+                self.finished.emit(True, res)
         except Exception as e:
             self.finished.emit(False, str(e))
 
@@ -471,13 +473,16 @@ class DroidMasterApp(QMainWindow):
             self.lbl_device_model.setText(self.devices[idx]["model"])
             self.fetch_telemetry()
 
-    def run_async(self, fn, callback):
-        worker = AsyncWorker(fn)
+    def run_async(self, fn, callback, *args, **kwargs):
+        worker = AsyncWorker(fn, *args, **kwargs)
         self.workers.append(worker)
-        def on_finished(ok, res):
+        def on_finished(ok: bool, res: object):
             if worker in self.workers:
                 self.workers.remove(worker)
-            callback(ok, res)
+            try:
+                callback(ok, res)
+            except Exception as e:
+                self.log(f"⚠️ Lỗi xử lý callback: {e}")
         worker.finished.connect(on_finished)
         worker.start()
 
@@ -490,18 +495,20 @@ class DroidMasterApp(QMainWindow):
 
         self.run_async(task, self._render_telemetry)
 
-    def _render_telemetry(self, ok, res_str):
+    def _render_telemetry(self, ok: bool, res_data: object):
         if not ok or not self.active_serial:
             return
-        info = eval(res_str) if isinstance(res_str, str) and res_str.startswith("{") else {}
+        info = res_data if isinstance(res_data, dict) else {}
         if not info:
             return
 
-        self.lbl_device_model.setText(info.get("model", "Android"))
-        self.val_battery.setText(f"{info.get('battery_level', '--')} ({info.get('battery_temp', '--')})")
-        self.val_os.setText(info.get("android_version", "--"))
-        self.val_ip.setText(info.get("ip", "--"))
-        self.val_res.setText(info.get("resolution", "--"))
+        self.lbl_device_model.setText(str(info.get("model", "Android")))
+        battery_lvl = info.get("battery_level", "--")
+        battery_temp = info.get("battery_temp", "--")
+        self.val_battery.setText(f"{battery_lvl} ({battery_temp})")
+        self.val_os.setText(str(info.get("android_version", "--")))
+        self.val_ip.setText(str(info.get("ip", "--")))
+        self.val_res.setText(str(info.get("resolution", "--")))
 
     def auto_poll_telemetry(self):
         if self.active_serial:
@@ -593,8 +600,8 @@ class DroidMasterApp(QMainWindow):
         def task():
             return adb_core.take_screenshot(self.active_serial, filepath)
 
-        def on_done(ok, _):
-            if ok:
+        def on_done(ok: bool, res: object):
+            if ok and res:
                 self.log(f"📸 Đã lưu ảnh chụp: {filepath}")
                 os.system(f'start "" "{filepath}"')
             else:
@@ -614,13 +621,14 @@ class DroidMasterApp(QMainWindow):
         def task():
             return adb_core.install_apk(self.active_serial, path)
 
-        def on_done(ok, msg):
+        def on_done(ok: bool, msg: object):
+            msg_str = str(msg)
             if ok:
                 QMessageBox.information(self, "Thành công", f"Đã cài đặt thành công:\n{os.path.basename(path)}")
-                self.log(f"✅ {msg}")
+                self.log(f"✅ {msg_str}")
             else:
-                QMessageBox.critical(self, "Lỗi cài đặt", msg)
-                self.log(f"❌ {msg}")
+                QMessageBox.critical(self, "Lỗi cài đặt", msg_str)
+                self.log(f"❌ {msg_str}")
 
         self.run_async(task, on_done)
 
@@ -637,7 +645,8 @@ class DroidMasterApp(QMainWindow):
         def task():
             return adb_core.switch_to_wifi(self.active_serial, ip, 5555)
 
-        def on_done(ok, msg):
+        def on_done(ok: bool, msg: object):
+            msg_str = str(msg)
             if ok:
                 QMessageBox.information(
                     self, "Thành công",
@@ -645,19 +654,33 @@ class DroidMasterApp(QMainWindow):
                 )
                 self.reload_devices()
             else:
-                QMessageBox.warning(self, "Lỗi kết nối", msg)
+                QMessageBox.warning(self, "Lỗi kết nối", msg_str)
 
         self.run_async(task, on_done)
 
     def action_run_bot(self):
-        macro_path = r"C:\Users\phamn\.gemini\antigravity\scratch\phantom_agent.py"
+        macro_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "phantom_agent.py")
+        if not os.path.exists(macro_path):
+            macro_path = os.path.join(os.getcwd(), "phantom_agent.py")
         if os.path.exists(macro_path):
-            subprocess.Popen([sys.executable, macro_path], creationflags=subprocess.CREATE_NEW_CONSOLE)
+            args = [sys.executable, macro_path]
+            if self.active_serial:
+                args.append(self.active_serial)
+            flags = subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0
+            subprocess.Popen(args, creationflags=flags)
             self.log("🤖 Đã kích hoạt Bot Phantom Scroll (mở cửa sổ giám sát riêng).")
         else:
             QMessageBox.warning(self, "Lỗi", "Không tìm thấy phantom_agent.py!")
 
     def closeEvent(self, event):
+        for worker in list(self.workers):
+            try:
+                if worker.isRunning():
+                    worker.quit()
+                    worker.wait(500)
+            except Exception:
+                pass
+        self.workers.clear()
         if self.scrcpy_proc and self.scrcpy_proc.poll() is None:
             self.scrcpy_proc.terminate()
         event.accept()

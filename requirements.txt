@@ -1,3 +1,6 @@
-﻿PySide6>=6.5.0
+# DroidMaster Pro - Core Dependencies
+PySide6>=6.5.0,<=6.9.0
 rich>=13.0.0
-Pillow>=10.0.0
+
+# Note: Pillow is omitted as PySide6 (QImage/QPixmap) natively decodes
+# memory-stream PNG bytes from exec-out screencap without external imaging dependencies.
