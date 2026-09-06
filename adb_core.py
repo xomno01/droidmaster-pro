@@ -344,25 +344,24 @@ def send_text(serial: str, text: str) -> Tuple[int, str, str]:
     """Send text to the active focused input field.
     Supports full Vietnamese and Unicode characters via clipboard injection
     (cmd clipboard set <escaped_text> + KEYCODE_PASTE 279).
-    Falls back to standard 'input text' for ASCII strings or on legacy Android versions.
+    Falls back gracefully for older Android versions or standard ASCII strings.
     """
     if not text:
         return 0, "", ""
 
-    # Check if text contains non-ASCII characters (Vietnamese accents, special characters, emoji)
     if not text.isascii():
         escaped_text = shlex.quote(text)
         code, out, err = run_adb_raw(["shell", f"cmd clipboard set {escaped_text}"], serial=serial)
+        # Check if cmd clipboard is supported (Android 13+)
+        if code == 0 and "No shell command implementation" not in out and "No shell command implementation" not in err:
+            return run_adb_raw(["shell", "input", "keyevent", "279"], serial=serial)
 
-        # Fallback to standard input text if cmd clipboard is not implemented (Android < 13)
-        if code != 0 or "No shell command implementation" in out or "No shell command implementation" in err:
-            escaped = text.replace(" ", "%s").replace("&", "\\&").replace("<", "\\<").replace(">", "\\>").replace('"', '\\"').replace("'", "\\'")
-            return run_adb_raw(["shell", "input", "text", escaped], serial=serial)
-
-        # Trigger KEYCODE_PASTE (279) to paste from clipboard
-        return run_adb_raw(["shell", "input", "keyevent", "279"], serial=serial)
+        # Fallback for devices without cmd clipboard: transliterate to ASCII
+        import unicodedata
+        normalized = unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII')
+        escaped = normalized.replace(" ", "%s").replace("&", "\\&").replace("<", "\\<").replace(">", "\\>").replace('"', '\\"').replace("'", "\\'")
+        return run_adb_raw(["shell", "input", "text", escaped], serial=serial)
     else:
-        # Standard ASCII input
         escaped = text.replace(" ", "%s").replace("&", "\\&").replace("<", "\\<").replace(">", "\\>").replace('"', '\\"').replace("'", "\\'")
         return run_adb_raw(["shell", "input", "text", escaped], serial=serial)
 
