@@ -38,10 +38,18 @@ QFrame.bentoCard {
     background-color: #111827;
     border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 16px;
-    padding: 16px;
+    padding: 14px 12px;
 }
 QFrame.bentoCard:hover {
     border-color: rgba(255, 255, 255, 0.14);
+}
+
+QFrame.bentoCard QPushButton {
+    min-height: 36px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 6px 12px;
 }
 
 /* Sidebar Container */
@@ -63,7 +71,7 @@ QFrame#heroCard {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #131d2e, stop:1 #0f172a);
     border: 1px solid rgba(56, 189, 248, 0.25);
     border-radius: 18px;
-    padding: 20px;
+    padding: 16px 14px;
 }
 
 /* Labels */
@@ -169,8 +177,9 @@ QPushButton#primaryHeroBtn {
     border: none;
     border-radius: 12px;
     font-size: 14px;
-    font-weight: 700;
-    padding: 12px 24px;
+    font-weight: 800;
+    min-height: 40px;
+    padding: 8px 16px;
 }
 
 QPushButton#primaryHeroBtn:hover {
@@ -245,9 +254,10 @@ QPushButton.appIconBtn {
     background-color: #162032;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    padding: 10px;
+    padding: 6px 10px;
     font-weight: 600;
     font-size: 12px;
+    min-height: 32px;
 }
 
 QPushButton.appIconBtn:hover {

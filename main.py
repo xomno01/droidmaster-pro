@@ -89,7 +89,7 @@ class DroidMasterApp(QMainWindow):
         if os.path.exists(icon_file):
             self.setWindowIcon(QIcon(icon_file))
         self.resize(1020, 740)
-        self.setMinimumSize(780, 480)
+        self.setMinimumSize(680, 460)
         self.setStyleSheet(DARK_THEME_QSS)
 
         self.active_serial = None
@@ -128,16 +128,16 @@ class DroidMasterApp(QMainWindow):
         sidebar_scroll.setFrameShape(QFrame.NoFrame)
         sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         sidebar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        sidebar_scroll.setMinimumWidth(260)
-        sidebar_scroll.setMaximumWidth(340)
+        sidebar_scroll.setMinimumWidth(250)
+        sidebar_scroll.setMaximumWidth(310)
 
         sidebar = QFrame()
         sidebar.setObjectName("sidebarFrame")
-        sidebar.setMinimumWidth(260)
-        sidebar.setMaximumWidth(340)
+        sidebar.setMinimumWidth(250)
+        sidebar.setMaximumWidth(310)
         side_layout = QVBoxLayout(sidebar)
-        side_layout.setContentsMargins(18, 20, 18, 20)
-        side_layout.setSpacing(16)
+        side_layout.setContentsMargins(14, 16, 14, 16)
+        side_layout.setSpacing(14)
 
         # 1. App Branding
         brand_row = QHBoxLayout()
@@ -145,7 +145,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.8.0")
+        lbl_ver = QLabel("v2.8.1")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -296,10 +296,10 @@ class DroidMasterApp(QMainWindow):
         # =============================================================
         # RIGHT COLUMN: MAIN CANVAS (HERO STREAM + BENTO TILES)
         # =============================================================
-        main_content = QWidget()
-        content_layout = QVBoxLayout(main_content)
-        content_layout.setContentsMargins(28, 24, 28, 24)
-        content_layout.setSpacing(20)
+        self.main_content = QWidget()
+        content_layout = QVBoxLayout(self.main_content)
+        content_layout.setContentsMargins(14, 14, 14, 14)
+        content_layout.setSpacing(14)
 
         # -------------------------------------------------------------
         # HERO SECTION: SCRCPY 60FPS SCREEN MIRRORING
@@ -307,100 +307,112 @@ class DroidMasterApp(QMainWindow):
         hero_card = QFrame()
         hero_card.setObjectName("heroCard")
         hero_layout = QVBoxLayout(hero_card)
-        hero_layout.setContentsMargins(22, 20, 22, 20)
-        hero_layout.setSpacing(16)
+        hero_layout.setContentsMargins(16, 14, 16, 14)
+        hero_layout.setSpacing(12)
 
-        # Top row: Title + Live Status Badge
-        hero_top = QHBoxLayout()
+        # 1. Header Title Block
         hero_title_box = QVBoxLayout()
-        hero_title_box.setSpacing(4)
+        hero_title_box.setSpacing(3)
 
         lbl_hero_head = QLabel("🖥️ Chiếu Màn Hình Thời Gian Thực (Scrcpy Pro)")
-        lbl_hero_head.setStyleSheet("font-size: 17px; font-weight: 800; color: #f8fafc;")
-        lbl_hero_sub = QLabel("Chuẩn 60 FPS • Độ trễ thấp 35-70ms • GPU giải mã phần cứng siêu nhẹ (< 1% CPU)")
+        lbl_hero_head.setStyleSheet("font-size: 16px; font-weight: 800; color: #f8fafc;")
+        lbl_hero_head.setWordWrap(True)
+
+        lbl_hero_sub = QLabel("Chuẩn 60 FPS • Độ trễ 35-70ms • GPU giải mã siêu nhẹ (< 1% CPU)")
         lbl_hero_sub.setStyleSheet("font-size: 12px; color: #94a3b8;")
+        lbl_hero_sub.setWordWrap(True)
 
         hero_title_box.addWidget(lbl_hero_head)
         hero_title_box.addWidget(lbl_hero_sub)
-        hero_top.addLayout(hero_title_box)
-        hero_top.addStretch()
+        hero_layout.addLayout(hero_title_box)
 
+        # 2. Hero Stream Action Button (Prominent Center Control Bar)
         self.btn_hero_stream = QPushButton("▶ BẬT CHIẾU MÀN HÌNH")
         self.btn_hero_stream.setObjectName("primaryHeroBtn")
         self.btn_hero_stream.setCursor(QCursor(Qt.PointingHandCursor))
+        self.btn_hero_stream.setMinimumHeight(42)
+        self.btn_hero_stream.setMinimumWidth(180)
+        self.btn_hero_stream.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.btn_hero_stream.clicked.connect(self.action_toggle_stream)
-        hero_top.addWidget(self.btn_hero_stream)
+        hero_layout.addWidget(self.btn_hero_stream)
 
-        hero_layout.addLayout(hero_top)
+        # 3. Toggles Grid: 2 rows x 2 columns
+        toggles_grid = QGridLayout()
+        toggles_grid.setHorizontalSpacing(14)
+        toggles_grid.setVerticalSpacing(8)
 
-        # Bottom row: Pro Toggles & Quality
-        toggles_row = QHBoxLayout()
-        toggles_row.setSpacing(18)
-
-        self.chk_turn_off = QCheckBox("Tắt màn hình điện thoại (Chống nóng máy)")
-        self.chk_always_top = QCheckBox("Luôn ghim trên cùng (Always on Top)")
+        self.chk_turn_off = QCheckBox("Tắt màn hình điện thoại")
+        self.chk_turn_off.setToolTip("Tắt màn hình điện thoại (Chống nóng máy)")
+        self.chk_always_top = QCheckBox("Luôn ghim trên cùng")
+        self.chk_always_top.setToolTip("Luôn ghim trên cùng (Always on Top)")
         self.chk_always_top.setChecked(True)
         self.chk_stay_awake = QCheckBox("Không khóa màn hình")
+        self.chk_stay_awake.setToolTip("Không khóa màn hình (Stay awake)")
         self.chk_stay_awake.setChecked(True)
 
-        toggles_row.addWidget(self.chk_turn_off)
-        toggles_row.addWidget(self.chk_always_top)
-        toggles_row.addWidget(self.chk_stay_awake)
-        toggles_row.addStretch()
-
-        # Quality Combo
+        # Quality Combo (with label)
+        quality_box = QHBoxLayout()
+        quality_box.setContentsMargins(0, 0, 0, 0)
+        quality_box.setSpacing(6)
         lbl_q = QLabel("Chất lượng:")
         lbl_q.setStyleSheet("color: #64748b; font-size: 12px;")
         self.combo_quality = QComboBox()
+        self.combo_quality.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.combo_quality.addItems(["Chuẩn (1080p - 8Mbps)", "Siêu nhẹ (720p - 4Mbps)", "Gốc (Full HD+ - 16Mbps)"])
+        quality_box.addWidget(lbl_q)
+        quality_box.addWidget(self.combo_quality)
 
-        toggles_row.addWidget(lbl_q)
-        toggles_row.addWidget(self.combo_quality)
+        toggles_grid.addWidget(self.chk_turn_off, 0, 0)
+        toggles_grid.addWidget(self.chk_always_top, 0, 1)
+        toggles_grid.addWidget(self.chk_stay_awake, 1, 0)
+        toggles_grid.addLayout(quality_box, 1, 1)
 
-        hero_layout.addLayout(toggles_row)
+        hero_layout.addLayout(toggles_grid)
         content_layout.addWidget(hero_card)
 
         # -------------------------------------------------------------
-        # BENTO GRID: 4 ACTION TILES
+        # BENTO GRID: 4 ACTION TILES (ADAPTIVE 1 OR 2 COLUMNS)
         # -------------------------------------------------------------
         lbl_bento_head = QLabel("TÁC VỤ & CÔNG CỤ NHANH")
         lbl_bento_head.setObjectName("metricLabel")
         content_layout.addWidget(lbl_bento_head)
 
-        bento_grid = QGridLayout()
-        bento_grid.setHorizontalSpacing(16)
-        bento_grid.setVerticalSpacing(16)
+        self.bento_grid = QGridLayout()
+        self.bento_grid.setHorizontalSpacing(14)
+        self.bento_grid.setVerticalSpacing(14)
 
         def create_bento_tile(icon, title, desc, btn_text, callback, accent_color="#38bdf8"):
             tile = QFrame()
             tile.setProperty("class", "bentoCard")
-            tile.setMinimumHeight(130)
+            tile.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+            tile.setMinimumHeight(125)
             t_layout = QVBoxLayout(tile)
-            t_layout.setContentsMargins(18, 16, 18, 16)
-            t_layout.setSpacing(8)
+            t_layout.setContentsMargins(16, 14, 16, 14)
+            t_layout.setSpacing(6)
 
             head_h = QHBoxLayout()
+            head_h.setSpacing(8)
             icon_lbl = QLabel(icon)
-            icon_lbl.setStyleSheet(f"font-size: 22px; color: {accent_color};")
+            icon_lbl.setStyleSheet(f"font-size: 20px; color: {accent_color};")
             t_title = QLabel(title)
             t_title.setObjectName("cardTitle")
             t_title.setWordWrap(True)
             head_h.addWidget(icon_lbl)
-            head_h.addWidget(t_title)
-            head_h.addStretch()
+            head_h.addWidget(t_title, 1)
 
             t_desc = QLabel(desc)
             t_desc.setObjectName("cardDesc")
             t_desc.setWordWrap(True)
 
             action_btn = QPushButton(btn_text)
-            action_btn.setMinimumHeight(38)
+            action_btn.setMinimumHeight(36)
             action_btn.setCursor(QCursor(Qt.PointingHandCursor))
+            action_btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             action_btn.clicked.connect(callback)
 
             t_layout.addLayout(head_h)
             t_layout.addWidget(t_desc)
-            t_layout.addSpacing(4)
+            t_layout.addStretch()
             t_layout.addWidget(action_btn)
             return tile, action_btn
 
@@ -428,22 +440,20 @@ class DroidMasterApp(QMainWindow):
             "Kích hoạt Bot (60s)", self.action_run_bot, "#8b5cf6"
         )
 
-        bento_grid.addWidget(tile_snap, 0, 0)
-        bento_grid.addWidget(tile_apk, 0, 1)
-        bento_grid.addWidget(tile_wifi, 1, 0)
-        bento_grid.addWidget(tile_bot, 1, 1)
-
-        content_layout.addLayout(bento_grid)
+        self.bento_tiles = [tile_snap, tile_apk, tile_wifi, tile_bot]
+        content_layout.addLayout(self.bento_grid)
+        self.relayout_bento(500)
 
         # -------------------------------------------------------------
-        # QUICK APP LAUNCHER STRIP
+        # QUICK APP LAUNCHER: 2 ROWS X 3 COLUMNS GRID
         # -------------------------------------------------------------
-        app_strip_box = QHBoxLayout()
-        app_strip_box.setSpacing(10)
-
-        lbl_apps = QLabel("MỞ NHANH:")
+        lbl_apps = QLabel("MỞ NHANH ỨNG DỤNG")
         lbl_apps.setObjectName("metricLabel")
-        app_strip_box.addWidget(lbl_apps)
+        content_layout.addWidget(lbl_apps)
+
+        app_grid = QGridLayout()
+        app_grid.setHorizontalSpacing(10)
+        app_grid.setVerticalSpacing(8)
 
         quick_apps = [
             ("▶ YouTube", "com.google.android.youtube"),
@@ -454,15 +464,17 @@ class DroidMasterApp(QMainWindow):
             ("📷 Camera", "com.android.camera")
         ]
 
-        for name, pkg in quick_apps:
+        for idx, (name, pkg) in enumerate(quick_apps):
+            r = idx // 3
+            c = idx % 3
             btn_app = QPushButton(name)
             btn_app.setProperty("class", "appIconBtn")
             btn_app.setCursor(QCursor(Qt.PointingHandCursor))
+            btn_app.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             btn_app.clicked.connect(lambda _, p=pkg: self.action_launch_app(p))
-            app_strip_box.addWidget(btn_app)
+            app_grid.addWidget(btn_app, r, c)
 
-        app_strip_box.addStretch()
-        content_layout.addLayout(app_strip_box)
+        content_layout.addLayout(app_grid)
 
         # -------------------------------------------------------------
         # TERMINAL / LOG CONSOLE (macOS Style)
@@ -495,17 +507,60 @@ class DroidMasterApp(QMainWindow):
         term_layout.addWidget(self.txt_log)
         content_layout.addWidget(term_frame)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll.setWidget(main_content)
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setFrameShape(QFrame.NoFrame)
+        self.scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.scroll.setWidget(self.main_content)
 
-        root_layout.addWidget(scroll, 1)
+        root_layout.addWidget(self.scroll, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.7.0 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.8.0 sẵn sàng.")
+
+    def relayout_bento(self, width: int = None):
+        if not hasattr(self, 'bento_tiles') or not hasattr(self, 'bento_grid'):
+            return
+        if width is None or width <= 0:
+            if hasattr(self, 'main_content') and self.main_content.width() > 0:
+                width = self.main_content.width()
+            elif hasattr(self, 'scroll') and self.scroll.viewport().width() > 0:
+                width = self.scroll.viewport().width()
+            else:
+                width = 500
+
+        target_cols = 1 if width < 560 else 2
+        if getattr(self, "_bento_cols", None) == target_cols:
+            return
+        self._bento_cols = target_cols
+
+        for tile in self.bento_tiles:
+            self.bento_grid.removeWidget(tile)
+
+        if target_cols == 1:
+            self.bento_grid.setColumnStretch(0, 1)
+            self.bento_grid.setColumnStretch(1, 0)
+            for idx, tile in enumerate(self.bento_tiles):
+                self.bento_grid.addWidget(tile, idx, 0)
+                tile.setVisible(True)
+        else:
+            self.bento_grid.setColumnStretch(0, 1)
+            self.bento_grid.setColumnStretch(1, 1)
+            self.bento_grid.addWidget(self.bento_tiles[0], 0, 0)
+            self.bento_grid.addWidget(self.bento_tiles[1], 0, 1)
+            self.bento_grid.addWidget(self.bento_tiles[2], 1, 0)
+            self.bento_grid.addWidget(self.bento_tiles[3], 1, 1)
+            for tile in self.bento_tiles:
+                tile.setVisible(True)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, 'main_content') and hasattr(self, 'bento_grid'):
+            w = self.main_content.width()
+            if w <= 0 and hasattr(self, 'scroll') and self.scroll.viewport().width() > 0:
+                w = self.scroll.viewport().width()
+            self.relayout_bento(w)
 
     # =================================================================
     # CONTROLLER ACTIONS & LOGIC

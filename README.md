@@ -1,16 +1,16 @@
-# ⚡ DroidMaster Pro v2.8.0 — Universal Android Control Center (Production-Grade & Responsive UI)
+# ⚡ DroidMaster Pro v2.8.1 — Universal Android Control Center (Adaptive Responsive Fix)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy hardware accelerated pipeline • Giao diện Responsive Bento Grid 2026 • Kiến trúc Enterprise v2.8.0 (Production-Grade & Responsive UI)</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy hardware accelerated pipeline • Giao diện Responsive Bento Grid 2026 • Kiến trúc Enterprise v2.8.1 (Adaptive Responsive Fix)</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.8.0%20(Production--Grade)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.0" />
+  <img src="https://img.shields.io/badge/Version-v2.8.1%20(Adaptive--Responsive--Fix)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.1" />
   <img src="https://img.shields.io/badge/Tests-100%25%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 100% Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
@@ -22,9 +22,9 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.0 (Production-Grade & Responsive UI)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.1 (Adaptive Responsive Fix)
 
-Phiên bản **v2.8.0 (Production-Grade & Responsive UI)** giải quyết toàn diện các đóng góp thẩm định kỹ thuật sâu sắc, loại bỏ các thông điệp tiếp thị phi thực tế, tối ưu hóa bố cục thích ứng đa màn hình và nâng cấp hệ thống telemetry cùng automation engine:
+Phiên bản **v2.8.1 (Adaptive Responsive Fix)** giải quyết triệt để lỗi tràn viền phải trên màn hình nhỏ/laptop DPI cao, hoàn thiện trải nghiệm responsive thích ứng động đa màn hình và nâng cấp hệ thống telemetry cùng automation engine:
 
 * 📐 **Responsive Bento Layout (Thích Ứng Đa Độ Phân Giải & Tỉ Lệ Scaling):**
   Tái cấu trúc hệ thống layout của giao diện chính bằng cơ chế `QScrollArea` kết hợp kích thước co giãn linh hoạt (`sizeHint` và dynamic constraint boundaries). Giao diện hiển thị trọn vẹn, không bị che khuất nút bấm hoặc tràn nội dung trên mọi độ phân giải màn hình — từ các dòng laptop nhỏ độ phân giải **1366x768** (với tỉ lệ hiển thị Windows DPI scaling **125% – 150%**) cho đến các màn hình đồ họa độ phân giải cao **4K UHD**.
