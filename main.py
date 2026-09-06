@@ -59,6 +59,7 @@ class DroidMasterApp(QMainWindow):
         self.scrcpy_proc = None
         self.devices = []
         self.workers = []
+        self.is_fetching_telemetry = False
 
         self.build_ui()
         self.reload_devices()
@@ -90,7 +91,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.5")
+        lbl_ver = QLabel("v2.6.0")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -434,7 +435,7 @@ class DroidMasterApp(QMainWindow):
         root_layout.addWidget(main_content, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.5 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.6.0 sẵn sàng.")
 
     # =================================================================
     # CONTROLLER ACTIONS & LOGIC
@@ -487,8 +488,10 @@ class DroidMasterApp(QMainWindow):
         worker.start()
 
     def fetch_telemetry(self):
-        if not self.active_serial:
+        if not self.active_serial or self.is_fetching_telemetry:
             return
+
+        self.is_fetching_telemetry = True
 
         def task():
             return adb_core.get_device_info(self.active_serial)
@@ -496,6 +499,7 @@ class DroidMasterApp(QMainWindow):
         self.run_async(task, self._render_telemetry)
 
     def _render_telemetry(self, ok: bool, res_data: object):
+        self.is_fetching_telemetry = False
         if not ok or not self.active_serial:
             return
         info = res_data if isinstance(res_data, dict) else {}
@@ -511,7 +515,7 @@ class DroidMasterApp(QMainWindow):
         self.val_res.setText(str(info.get("resolution", "--")))
 
     def auto_poll_telemetry(self):
-        if self.active_serial:
+        if self.active_serial and not self.is_fetching_telemetry:
             self.fetch_telemetry()
 
     def clear_specs(self):
@@ -603,7 +607,13 @@ class DroidMasterApp(QMainWindow):
         def on_done(ok: bool, res: object):
             if ok and res:
                 self.log(f"📸 Đã lưu ảnh chụp: {filepath}")
-                os.system(f'start "" "{filepath}"')
+                try:
+                    if hasattr(os, "startfile"):
+                        os.startfile(filepath)
+                    else:
+                        subprocess.Popen(["xdg-open", filepath])
+                except Exception:
+                    pass
             else:
                 QMessageBox.warning(self, "Lỗi", "Không thể chụp ảnh màn hình!")
 
@@ -663,7 +673,11 @@ class DroidMasterApp(QMainWindow):
         if not os.path.exists(macro_path):
             macro_path = os.path.join(os.getcwd(), "phantom_agent.py")
         if os.path.exists(macro_path):
-            args = [sys.executable, macro_path]
+            py_exec = sys.executable
+            if getattr(sys, 'frozen', False):
+                import shutil
+                py_exec = shutil.which("python") or "python"
+            args = [py_exec, macro_path]
             if self.active_serial:
                 args.append(self.active_serial)
             flags = subprocess.CREATE_NEW_CONSOLE if os.name == 'nt' else 0
