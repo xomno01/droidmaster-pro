@@ -423,6 +423,23 @@ class TestADBCore(unittest.TestCase):
                 connect_wifi("mock_device", "192.168.1.100", 5555, check=True)
             self.assertEqual(ctx.exception.returncode, 1)
 
+    def test_windows_job_object_binding(self):
+        """Verify Windows Job Object initialization and assignment functions."""
+        if os.name == 'nt':
+            job = adb_core.get_windows_job_object()
+            self.assertIsNotNone(job)
+            # Test assign_process_to_job with mock process
+            mock_proc = MagicMock()
+            mock_proc._handle = 0
+            # Should safely return bool without throwing exceptions
+            res = adb_core.assign_process_to_job(mock_proc)
+            self.assertIsInstance(res, bool)
+            # Test None safety
+            self.assertFalse(adb_core.assign_process_to_job(None))
+        else:
+            self.assertIsNone(adb_core.get_windows_job_object())
+            self.assertFalse(adb_core.assign_process_to_job(None))
+
     def test_take_screenshot_with_output_path(self):
         """Verify take_screenshot saves bytes to output_path and returns raw bytes."""
         import tempfile

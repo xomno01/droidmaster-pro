@@ -475,6 +475,102 @@ def get_device_info(serial: str, dynamic_only: bool = False, refresh_cache: bool
 
 
 # ==============================================================================
+# Windows Job Object Process Binding (Prevent Zombie / Orphan Child Processes)
+# ==============================================================================
+
+_WINDOWS_JOB_OBJECT = None
+
+def get_windows_job_object():
+    """Retrieve or initialize a global Windows Job Object configured with
+    JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE. Guarantees that all child processes
+    (such as scrcpy.exe) are automatically killed by Windows kernel if the
+    parent application exits for any reason (crash, user exit, kill).
+    """
+    global _WINDOWS_JOB_OBJECT
+    if os.name != 'nt':
+        return None
+    if _WINDOWS_JOB_OBJECT is not None:
+        return _WINDOWS_JOB_OBJECT
+
+    try:
+        import ctypes
+        from ctypes import wintypes
+        kernel32 = ctypes.windll.kernel32
+        job = kernel32.CreateJobObjectW(None, None)
+        if not job:
+            return None
+
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000
+        JobObjectExtendedLimitInformation = 9
+
+        class JOBOBJECT_BASIC_LIMIT_INFORMATION(ctypes.Structure):
+            _fields_ = [
+                ('PerProcessUserTimeLimit', wintypes.LARGE_INTEGER),
+                ('PerJobUserTimeLimit', wintypes.LARGE_INTEGER),
+                ('LimitFlags', wintypes.DWORD),
+                ('MinimumWorkingSetSize', ctypes.c_size_t),
+                ('MaximumWorkingSetSize', ctypes.c_size_t),
+                ('ActiveProcessLimit', wintypes.DWORD),
+                ('Affinity', ctypes.c_size_t),
+                ('PriorityClass', wintypes.DWORD),
+                ('SchedulingClass', wintypes.DWORD),
+            ]
+
+        class IO_COUNTERS(ctypes.Structure):
+            _fields_ = [
+                ('ReadOperationCount', ctypes.c_ulonglong),
+                ('WriteOperationCount', ctypes.c_ulonglong),
+                ('OtherOperationCount', ctypes.c_ulonglong),
+                ('ReadTransferCount', ctypes.c_ulonglong),
+                ('WriteTransferCount', ctypes.c_ulonglong),
+                ('OtherTransferCount', ctypes.c_ulonglong),
+            ]
+
+        class JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
+            _fields_ = [
+                ('BasicLimitInformation', JOBOBJECT_BASIC_LIMIT_INFORMATION),
+                ('IoCounters', IO_COUNTERS),
+                ('ProcessMemoryLimit', ctypes.c_size_t),
+                ('JobMemoryLimit', ctypes.c_size_t),
+                ('PeakProcessMemoryLimit', ctypes.c_size_t),
+                ('PeakJobMemoryLimit', ctypes.c_size_t),
+            ]
+
+        info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION()
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        ret = kernel32.SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            ctypes.byref(info),
+            ctypes.sizeof(info)
+        )
+        if ret:
+            _WINDOWS_JOB_OBJECT = job
+            return _WINDOWS_JOB_OBJECT
+    except Exception:
+        pass
+    return None
+
+
+def assign_process_to_job(proc: subprocess.Popen) -> bool:
+    """Assign a subprocess.Popen process to the global Windows Job Object."""
+    if os.name != 'nt' or proc is None:
+        return False
+    job = get_windows_job_object()
+    if not job:
+        return False
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = getattr(proc, "_handle", None)
+        if handle:
+            return bool(kernel32.AssignProcessToJobObject(job, int(handle)))
+    except Exception:
+        pass
+    return False
+
+
+# ==============================================================================
 # Screen Mirroring (Scrcpy)
 # ==============================================================================
 
@@ -482,6 +578,8 @@ def launch_scrcpy(serial: str, options: Dict) -> Optional[subprocess.Popen]:
     """Launch scrcpy with custom user options.
     If the specified serial is disconnected (e.g. user unplugged USB cable after enabling Wi-Fi),
     automatically redirects to the active Wi-Fi or available device.
+    Automatically binds the process to the Windows Job Object so it is guaranteed
+    to terminate when the parent application closes.
     """
     if not os.path.exists(SCRCPY_PATH):
         return None
@@ -524,6 +622,8 @@ def launch_scrcpy(serial: str, options: Dict) -> Optional[subprocess.Popen]:
             cwd=scrcpy_dir,
             creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
         )
+        if proc:
+            assign_process_to_job(proc)
         return proc
     except Exception:
         return None
@@ -1088,6 +1188,8 @@ __all__ = [
     "install_apk",
     "switch_to_wifi",
     "connect_wifi",
+    "get_windows_job_object",
+    "assign_process_to_job",
     "load_binary_manifest",
     "verify_binary_manifest",
     "reboot",

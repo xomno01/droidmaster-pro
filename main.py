@@ -11,7 +11,7 @@ import sys
 import time
 import subprocess
 import threading
-from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize, QEvent
+from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize, QEvent, QObject, QRunnable, QThreadPool
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QGridLayout, QLabel, QPushButton, QComboBox, QCheckBox,
@@ -24,26 +24,37 @@ import adb_core
 from styles import DARK_THEME_QSS
 from guide_dialog import UserGuideDialog
 
-class AsyncWorker(QThread):
+# Global unhandled exception hook to prevent Qt6 qFatal aborts (0xc0000409)
+def global_excepthook(exctype, value, tb):
+    import traceback
+    sys.stderr.write("".join(traceback.format_exception(exctype, value, tb)))
+
+sys.excepthook = global_excepthook
+
+class WorkerSignals(QObject):
     finished = Signal(bool, object)
 
+class AsyncWorker(QRunnable):
+    """ThreadPool worker that avoids QThread deletion race conditions."""
     def __init__(self, fn, *args, **kwargs):
         super().__init__()
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
+        self.signals = WorkerSignals()
+        self.setAutoDelete(True)
 
     def run(self):
         try:
             res = self.fn(*self.args, **self.kwargs)
             if isinstance(res, tuple) and len(res) == 2:
-                self.finished.emit(bool(res[0]), res[1])
+                self.signals.finished.emit(bool(res[0]), res[1])
             elif isinstance(res, bool):
-                self.finished.emit(res, res)
+                self.signals.finished.emit(res, res)
             else:
-                self.finished.emit(True, res)
+                self.signals.finished.emit(True, res)
         except Exception as e:
-            self.finished.emit(False, str(e))
+            self.signals.finished.emit(False, str(e))
 
 class PhantomBotWorker(QThread):
     sig_log = Signal(str)
@@ -114,6 +125,11 @@ class DroidMasterApp(QMainWindow):
         self.scrcpy_monitor_timer.timeout.connect(self.monitor_scrcpy_process)
         self.scrcpy_monitor_timer.start(1000)
 
+        # Connect application quit to cleanup
+        app_inst = QApplication.instance()
+        if app_inst:
+            app_inst.aboutToQuit.connect(self.cleanup_all)
+
     def build_ui(self):
         central = QWidget()
         root_layout = QHBoxLayout(central)
@@ -146,7 +162,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.8.6")
+        lbl_ver = QLabel("v2.8.7")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -548,54 +564,63 @@ class DroidMasterApp(QMainWindow):
         root_layout.addWidget(self.scroll, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.8.6 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.8.7 sẵn sàng.")
 
     def eventFilter(self, watched, event):
-        if hasattr(self, 'scroll') and watched == self.scroll.viewport():
-            if event.type() == QEvent.Resize:
-                self.relayout_bento(self.scroll.viewport().width())
+        try:
+            if hasattr(self, 'scroll') and watched == self.scroll.viewport():
+                if event.type() == QEvent.Resize:
+                    self.relayout_bento(self.scroll.viewport().width())
+        except Exception:
+            pass
         return super().eventFilter(watched, event)
 
     def relayout_bento(self, width: int = None):
-        if not hasattr(self, 'bento_tiles') or not hasattr(self, 'bento_grid'):
-            return
-        if width is None or width <= 0:
-            if hasattr(self, 'scroll') and self.scroll.viewport().width() > 0:
-                width = self.scroll.viewport().width()
-            elif hasattr(self, 'main_content') and self.main_content.width() > 0:
-                width = self.main_content.width()
-            else:
-                width = 500
+        try:
+            if not hasattr(self, 'bento_tiles') or not hasattr(self, 'bento_grid'):
+                return
+            if width is None or width <= 0:
+                if hasattr(self, 'scroll') and self.scroll.viewport().width() > 0:
+                    width = self.scroll.viewport().width()
+                elif hasattr(self, 'main_content') and self.main_content.width() > 0:
+                    width = self.main_content.width()
+                else:
+                    width = 500
 
-        target_cols = 1 if width < 560 else 2
-        if getattr(self, "_bento_cols", None) == target_cols:
-            return
-        self._bento_cols = target_cols
+            target_cols = 1 if width < 560 else 2
+            if getattr(self, "_bento_cols", None) == target_cols:
+                return
+            self._bento_cols = target_cols
 
-        for tile in self.bento_tiles:
-            self.bento_grid.removeWidget(tile)
-
-        if target_cols == 1:
-            self.bento_grid.setColumnStretch(0, 1)
-            self.bento_grid.setColumnStretch(1, 0)
-            for idx, tile in enumerate(self.bento_tiles):
-                self.bento_grid.addWidget(tile, idx, 0)
-                tile.setVisible(True)
-        else:
-            self.bento_grid.setColumnStretch(0, 1)
-            self.bento_grid.setColumnStretch(1, 1)
-            self.bento_grid.addWidget(self.bento_tiles[0], 0, 0)
-            self.bento_grid.addWidget(self.bento_tiles[1], 0, 1)
-            self.bento_grid.addWidget(self.bento_tiles[2], 1, 0)
-            self.bento_grid.addWidget(self.bento_tiles[3], 1, 1)
             for tile in self.bento_tiles:
-                tile.setVisible(True)
+                self.bento_grid.removeWidget(tile)
+
+            if target_cols == 1:
+                self.bento_grid.setColumnStretch(0, 1)
+                self.bento_grid.setColumnStretch(1, 0)
+                for idx, tile in enumerate(self.bento_tiles):
+                    self.bento_grid.addWidget(tile, idx, 0)
+                    tile.setVisible(True)
+            else:
+                self.bento_grid.setColumnStretch(0, 1)
+                self.bento_grid.setColumnStretch(1, 1)
+                self.bento_grid.addWidget(self.bento_tiles[0], 0, 0)
+                self.bento_grid.addWidget(self.bento_tiles[1], 0, 1)
+                self.bento_grid.addWidget(self.bento_tiles[2], 1, 0)
+                self.bento_grid.addWidget(self.bento_tiles[3], 1, 1)
+                for tile in self.bento_tiles:
+                    tile.setVisible(True)
+        except Exception:
+            pass
 
     def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if hasattr(self, 'scroll') and hasattr(self, 'bento_grid'):
-            w = self.scroll.viewport().width()
-            self.relayout_bento(w)
+        try:
+            super().resizeEvent(event)
+            if hasattr(self, 'scroll') and hasattr(self, 'bento_grid'):
+                w = self.scroll.viewport().width()
+                self.relayout_bento(w)
+        except Exception:
+            pass
 
     # =================================================================
     # CONTROLLER ACTIONS & LOGIC
@@ -667,17 +692,13 @@ class DroidMasterApp(QMainWindow):
 
     def run_async(self, fn, callback, *args, **kwargs):
         worker = AsyncWorker(fn, *args, **kwargs)
-        self.workers.append(worker)
         def on_finished(ok: bool, res: object):
-            if worker in self.workers:
-                self.workers.remove(worker)
-            worker.deleteLater()
             try:
                 callback(ok, res)
             except Exception as e:
                 self.log(f"⚠️ Lỗi xử lý callback: {e}")
-        worker.finished.connect(on_finished)
-        worker.start()
+        worker.signals.finished.connect(on_finished)
+        QThreadPool.globalInstance().start(worker)
 
     def fetch_telemetry(self, target_serial: str = None):
         target = target_serial or self.active_serial
@@ -715,27 +736,30 @@ class DroidMasterApp(QMainWindow):
         self.val_cpu.setText(str(cpu_val))
 
     def auto_poll_telemetry(self):
-        if self.is_fetching_telemetry:
-            return
+        try:
+            if self.is_fetching_telemetry:
+                return
 
-        # Check for device plug / unplug events dynamically
-        current_devs = adb_core.list_devices()
-        current_serials = [d["serial"] for d in current_devs]
+            # Check for device plug / unplug events dynamically
+            current_devs = adb_core.list_devices()
+            current_serials = [d["serial"] for d in current_devs]
 
-        # 1. Active device was disconnected
-        if self.active_serial and self.active_serial not in current_serials:
-            self.log(f"🔌 Thiết bị {self.active_serial} đã ngắt kết nối.")
-            self.reload_devices()
-            return
+            # 1. Active device was disconnected
+            if self.active_serial and self.active_serial not in current_serials:
+                self.log(f"🔌 Thiết bị {self.active_serial} đã ngắt kết nối.")
+                self.reload_devices()
+                return
 
-        # 2. A new device was connected while offline
-        if not self.active_serial and current_devs:
-            self.log("⚡ Phát hiện thiết bị Android kết nối.")
-            self.reload_devices()
-            return
+            # 2. A new device was connected while offline
+            if not self.active_serial and current_devs:
+                self.log("⚡ Phát hiện thiết bị Android kết nối.")
+                self.reload_devices()
+                return
 
-        if self.active_serial:
-            self.fetch_telemetry(self.active_serial)
+            if self.active_serial:
+                self.fetch_telemetry(self.active_serial)
+        except Exception:
+            pass
 
     def clear_specs(self):
         self.val_battery.setText("--")
@@ -745,90 +769,88 @@ class DroidMasterApp(QMainWindow):
         self.val_cpu.setText("--")
 
     def action_toggle_stream(self):
-        # Refresh and verify device presence before launching Scrcpy
-        current_devs = adb_core.list_devices()
-        current_serials = [d["serial"] for d in current_devs]
+        try:
+            # Refresh and verify device presence before launching Scrcpy
+            current_devs = adb_core.list_devices()
+            current_serials = [d["serial"] for d in current_devs]
 
-        if not self.active_serial or self.active_serial not in current_serials:
-            if current_devs:
-                self.log("🔄 Đồng bộ lại danh sách thiết bị trước khi bật chiếu...")
-                self.reload_devices()
+            if not self.active_serial or self.active_serial not in current_serials:
+                if current_devs:
+                    self.log("🔄 Đồng bộ lại danh sách thiết bị trước khi bật chiếu...")
+                    self.reload_devices()
+                else:
+                    last_wifi = adb_core.load_config().get("last_wifi_endpoint")
+                    if last_wifi:
+                        self.log(f"📶 Đang thử kết nối nhanh tới thiết bị Wi-Fi ({last_wifi})...")
+                        ok, msg = adb_core.connect_endpoint(last_wifi, timeout=4)
+                        if ok:
+                            self.log(f"✅ {msg}")
+                            self.reload_devices(preferred_serial=last_wifi)
+                            current_devs = adb_core.list_devices()
+                            current_serials = [d["serial"] for d in current_devs]
+
+                    if not self.active_serial or self.active_serial not in current_serials:
+                        QMessageBox.warning(self, "Chú ý", "Không tìm thấy thiết bị Android nào đang kết nối! Vui lòng kiểm tra cáp USB hoặc Wi-Fi.")
+                        return
+
+            if not self.active_serial:
+                QMessageBox.warning(self, "Chú ý", "Vui lòng kết nối một điện thoại Android trước!")
+                return
+
+            if self.scrcpy_proc and self.scrcpy_proc.poll() is None:
+                self.scrcpy_proc.terminate()
+                self.scrcpy_proc = None
+                self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
+                self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
+                self.log("⏹️ Đã tắt cửa sổ chiếu màn hình.")
+                if self.active_serial:
+                    target_ser = self.active_serial
+                    self.run_async(lambda: adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "false"], serial=target_ser), lambda ok, res: None)
             else:
-                last_wifi = adb_core.load_config().get("last_wifi_endpoint")
-                if last_wifi:
-                    self.log(f"📶 Đang thử kết nối nhanh tới thiết bị Wi-Fi ({last_wifi})...")
-                    ok, msg = adb_core.connect_endpoint(last_wifi, timeout=4)
-                    if ok:
-                        self.log(f"✅ {msg}")
-                        self.reload_devices(preferred_serial=last_wifi)
-                        current_devs = adb_core.list_devices()
-                        current_serials = [d["serial"] for d in current_devs]
+                q_idx = self.combo_quality.currentIndex()
+                res_val = 1080 if q_idx == 0 else (720 if q_idx == 1 else 0)
+                bit_val = "8M" if q_idx == 0 else ("4M" if q_idx == 1 else "16M")
 
-                if not self.active_serial or self.active_serial not in current_serials:
-                    QMessageBox.warning(self, "Chú ý", "Không tìm thấy thiết bị Android nào đang kết nối! Vui lòng kiểm tra cáp USB hoặc Wi-Fi.")
-                    return
+                opts = {
+                    "turn_screen_off": self.chk_turn_off.isChecked(),
+                    "always_on_top": self.chk_always_top.isChecked(),
+                    "stay_awake": self.chk_stay_awake.isChecked(),
+                    "max_size": res_val,
+                    "bitrate": bit_val,
+                    "title": f"DroidMaster // {self.lbl_device_model.text()}"
+                }
 
-        if not self.active_serial:
-            QMessageBox.warning(self, "Chú ý", "Vui lòng kết nối một điện thoại Android trước!")
-            return
+                self.scrcpy_proc = adb_core.launch_scrcpy(self.active_serial, opts)
+                if self.scrcpy_proc:
+                    self.btn_hero_stream.setText("■ DỪNG CHIẾU MÀN HÌNH")
+                    self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ef4444, stop:1 #dc2626); color: #ffffff;")
+                    self.log(f"🟢 Đã bật chiếu màn hình cho {self.lbl_device_model.text()} ({self.active_serial}).")
 
-        if self.scrcpy_proc and self.scrcpy_proc.poll() is None:
-            self.scrcpy_proc.terminate()
-            self.scrcpy_proc = None
-            self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
-            self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
-            self.log("⏹️ Đã tắt cửa sổ chiếu màn hình.")
-            if self.active_serial:
-                threading.Thread(
-                    target=adb_core.run_adb_raw,
-                    args=(["shell", "svc", "power", "stayon", "false"],),
-                    kwargs={"serial": self.active_serial},
-                    daemon=True
-                ).start()
-        else:
-            q_idx = self.combo_quality.currentIndex()
-            res_val = 1080 if q_idx == 0 else (720 if q_idx == 1 else 0)
-            bit_val = "8M" if q_idx == 0 else ("4M" if q_idx == 1 else "16M")
-
-            opts = {
-                "turn_screen_off": self.chk_turn_off.isChecked(),
-                "always_on_top": self.chk_always_top.isChecked(),
-                "stay_awake": self.chk_stay_awake.isChecked(),
-                "max_size": res_val,
-                "bitrate": bit_val,
-                "title": f"DroidMaster // {self.lbl_device_model.text()}"
-            }
-
-            self.scrcpy_proc = adb_core.launch_scrcpy(self.active_serial, opts)
-            if self.scrcpy_proc:
-                self.btn_hero_stream.setText("■ DỪNG CHIẾU MÀN HÌNH")
-                self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ef4444, stop:1 #dc2626); color: #ffffff;")
-                self.log(f"🟢 Đã bật chiếu màn hình cho {self.lbl_device_model.text()} ({self.active_serial}).")
-
-                # If user wants both screens on (turn_screen_off unchecked), ensure device screen is awake
-                target_ser = self.active_serial
-                if not opts.get("turn_screen_off", False):
-                    def wake_task():
-                        adb_core.send_keyevent(target_ser, "224")  # KEYCODE_WAKEUP
-                        if opts.get("stay_awake", True):
-                            adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "true"], serial=target_ser)
-                    threading.Thread(target=wake_task, daemon=True).start()
-            else:
-                QMessageBox.critical(self, "Lỗi", "Không thể bật Scrcpy. Hãy kiểm tra kết nối thiết bị!")
+                    # If user wants both screens on (turn_screen_off unchecked), ensure device screen is awake
+                    target_ser = self.active_serial
+                    if not opts.get("turn_screen_off", False):
+                        def wake_task():
+                            adb_core.send_keyevent(target_ser, "224")  # KEYCODE_WAKEUP
+                            if opts.get("stay_awake", True):
+                                adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "true"], serial=target_ser)
+                        self.run_async(wake_task, lambda ok, res: None)
+                else:
+                    QMessageBox.critical(self, "Lỗi", "Không thể bật Scrcpy. Hãy kiểm tra kết nối thiết bị!")
+        except Exception as e:
+            self.log(f"⚠️ Lỗi chuyển đổi màn hình chiếu: {e}")
 
     def monitor_scrcpy_process(self):
-        if self.scrcpy_proc != None and self.scrcpy_proc.poll() is not None:
-            self.scrcpy_proc = None
-            self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
-            self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
-            self.log("⏹️ Cửa sổ chiếu màn hình Scrcpy đã đóng.")
-            if self.active_serial:
-                threading.Thread(
-                    target=adb_core.run_adb_raw,
-                    args=(["shell", "svc", "power", "stayon", "false"],),
-                    kwargs={"serial": self.active_serial},
-                    daemon=True
-                ).start()
+        try:
+            if self.scrcpy_proc != None and self.scrcpy_proc.poll() is not None:
+                self.scrcpy_proc = None
+                self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
+                self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
+                self.log("⏹️ Cửa sổ chiếu màn hình Scrcpy đã đóng.")
+                if self.active_serial:
+                    target_ser = self.active_serial
+                    self.run_async(lambda: adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "false"], serial=target_ser), lambda ok, res: None)
+        except Exception:
+            pass
 
     def action_wake_screen(self):
         if not self.active_serial:
@@ -1100,26 +1122,26 @@ class DroidMasterApp(QMainWindow):
             self.log("⏹️ Bot Phantom Scroll đã dừng hoặc kết thúc.")
         self.bot_worker = None
 
-    def closeEvent(self, event):
+    def cleanup_all(self):
         # 1. Cancel and terminate bot worker
-        if self.bot_worker is not None and self.bot_worker.isRunning():
+        if getattr(self, "bot_worker", None) is not None and self.bot_worker.isRunning():
             try:
                 self.bot_worker.cancel()
                 self.bot_worker.quit()
-                if not self.bot_worker.wait(1000):
+                if not self.bot_worker.wait(800):
                     self.bot_worker.terminate()
-                    self.bot_worker.wait(500)
+                    self.bot_worker.wait(400)
             except Exception:
                 pass
             self.bot_worker = None
 
         # 2. Terminate / kill scrcpy process
-        if self.scrcpy_proc is not None:
+        if getattr(self, "scrcpy_proc", None) is not None:
             try:
                 if self.scrcpy_proc.poll() is None:
                     self.scrcpy_proc.terminate()
                     try:
-                        self.scrcpy_proc.wait(timeout=1.0)
+                        self.scrcpy_proc.wait(timeout=0.8)
                     except subprocess.TimeoutExpired:
                         self.scrcpy_proc.kill()
             except Exception:
@@ -1138,16 +1160,17 @@ class DroidMasterApp(QMainWindow):
         except Exception:
             pass
 
-        # 4. Cleanup background workers
-        for worker in list(self.workers):
-            try:
-                if worker.isRunning():
-                    worker.quit()
-                    worker.wait(500)
-            except Exception:
-                pass
-        self.workers.clear()
+        # 4. Drain thread pool cleanly
+        try:
+            QThreadPool.globalInstance().waitForDone(500)
+        except Exception:
+            pass
 
+    def closeEvent(self, event):
+        try:
+            self.cleanup_all()
+        except Exception:
+            pass
         event.accept()
 
 if __name__ == "__main__":
