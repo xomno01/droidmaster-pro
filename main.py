@@ -23,6 +23,8 @@ from PySide6.QtGui import QFont, QCursor, QIcon
 import adb_core
 from styles import DARK_THEME_QSS
 from guide_dialog import UserGuideDialog
+from device_manager import DeviceProfile, device_manager
+from profile_dialog import ProfileDialog
 
 # Global unhandled exception hook to prevent Qt6 qFatal aborts (0xc0000409)
 def global_excepthook(exctype, value, tb):
@@ -105,6 +107,9 @@ class DroidMasterApp(QMainWindow):
         self.setStyleSheet(DARK_THEME_QSS)
 
         self.active_serial = None
+        self.active_profile = None
+        self.is_stream_manually_stopped = False
+        self.reconnect_attempts = 0
         self.scrcpy_proc = None
         self.bot_worker = None
         self.btn_bot = None
@@ -113,6 +118,7 @@ class DroidMasterApp(QMainWindow):
         self.is_fetching_telemetry = False
 
         self.build_ui()
+        self.reload_profiles()
         self.reload_devices()
 
         # Telemetry auto-refresh every 6 seconds
@@ -162,7 +168,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.8.7")
+        lbl_ver = QLabel("v2.9.0")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -177,6 +183,47 @@ class DroidMasterApp(QMainWindow):
         btn_guide.setToolTip("Mở cẩm nang hướng dẫn bật ADB theo từng dòng máy và sử dụng toàn bộ tính năng")
         btn_guide.clicked.connect(self.open_user_guide)
         side_layout.addWidget(btn_guide)
+
+        # 1.5. Smart Device Profiles (Danh bạ thiết bị thông minh)
+        prof_box = QVBoxLayout()
+        prof_box.setSpacing(6)
+        lbl_prof = QLabel("DANH BẠ MÁY (PROFILES)")
+        lbl_prof.setObjectName("metricLabel")
+
+        prof_row = QHBoxLayout()
+        self.combo_profiles = QComboBox()
+        self.combo_profiles.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.combo_profiles.currentIndexChanged.connect(self.on_profile_selected)
+
+        self.btn_manage_profiles = QPushButton("⚙️")
+        self.btn_manage_profiles.setToolTip("Quản lý danh bạ thiết bị (IP Tailscale / LAN / Cấu hình riêng)")
+        self.btn_manage_profiles.setFixedWidth(36)
+        self.btn_manage_profiles.clicked.connect(self.open_profile_manager)
+
+        prof_row.addWidget(self.combo_profiles)
+        prof_row.addWidget(self.btn_manage_profiles)
+
+        self.btn_one_click_connect = QPushButton("⚡ KẾT NỐI NHANH (1-CLICK)")
+        self.btn_one_click_connect.setCursor(QCursor(Qt.PointingHandCursor))
+        self.btn_one_click_connect.setStyleSheet("""
+            QPushButton {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2563eb, stop:1 #1d4ed8);
+                color: #ffffff;
+                font-weight: 700;
+                font-size: 13px;
+                border-radius: 8px;
+                padding: 7px 12px;
+            }
+            QPushButton:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #3b82f6, stop:1 #2563eb);
+            }
+        """)
+        self.btn_one_click_connect.clicked.connect(self.action_one_click_connect)
+
+        prof_box.addWidget(lbl_prof)
+        prof_box.addLayout(prof_row)
+        prof_box.addWidget(self.btn_one_click_connect)
+        side_layout.addLayout(prof_box)
 
         # 2. Device Selector Dropdown
         dev_sel_box = QVBoxLayout()
@@ -768,6 +815,124 @@ class DroidMasterApp(QMainWindow):
         self.val_res.setText("--")
         self.val_cpu.setText("--")
 
+    # =============================================================
+    # SMART PROFILES & 1-CLICK REMOTE ENGINE
+    # =============================================================
+    def reload_profiles(self, preferred_id=None):
+        """Reload profile list from device_manager into combobox."""
+        try:
+            self.combo_profiles.blockSignals(True)
+            self.combo_profiles.clear()
+            profiles = device_manager.get_profiles()
+            sel_idx = 0
+            for idx, p in enumerate(profiles):
+                display = f"{p.name}"
+                self.combo_profiles.addItem(display, p.id)
+                if preferred_id and p.id == preferred_id:
+                    sel_idx = idx
+            if self.combo_profiles.count() > 0:
+                self.combo_profiles.setCurrentIndex(sel_idx)
+            self.combo_profiles.blockSignals(False)
+            if profiles:
+                self.on_profile_selected(sel_idx)
+        except Exception as e:
+            self.log(f"⚠️ Lỗi nạp danh bạ thiết bị: {e}")
+
+    def on_profile_selected(self, index=None):
+        p_id = self.combo_profiles.currentData()
+        if p_id:
+            self.active_profile = device_manager.get_profile(p_id)
+
+    def open_profile_manager(self):
+        dlg = ProfileDialog(self)
+        dlg.profiles_changed.connect(lambda: self.reload_profiles(preferred_id=self.active_profile.id if self.active_profile else None))
+        dlg.exec()
+
+    def action_one_click_connect(self):
+        """1-Click Smart Connection: Resolves optimal route, connects ADB, and starts stream."""
+        p_id = self.combo_profiles.currentData()
+        profile = device_manager.get_profile(p_id) if p_id else None
+        if not profile:
+            self.log("⚠️ Vui lòng chọn hoặc tạo một hồ sơ thiết bị trước!")
+            self.open_profile_manager()
+            return
+
+        self.active_profile = profile
+        self.log(f"⚡ [1-CLICK] Đang phân giải lộ trình tối ưu cho '{profile.name}'...")
+
+        # 1. Resolve optimal route
+        connected = [d["serial"] for d in adb_core.list_devices() if d.get("state") == "device"]
+        route_type, target = device_manager.resolve_best_route(profile, connected_serials=connected)
+
+        if not target:
+            self.log(f"❌ Không tìm thấy địa chỉ hợp lệ cho '{profile.name}'. Vui lòng mở Quản lý danh bạ để cài đặt IP.")
+            self.open_profile_manager()
+            return
+
+        self.log(f"🌐 Lộ trình được chọn: [{route_type}] -> {target}")
+
+        def connect_task():
+            if ":" in target:
+                ok, msg = adb_core.connect_endpoint(target, timeout=4)
+                return ok, msg, target
+            return True, "Thiết bị USB sẵn sàng", target
+
+        def on_connected(success, result):
+            if not success:
+                self.log(f"❌ Kết nối thất bại: {result}")
+                QMessageBox.warning(self, "Kết nối thất bại", f"Không thể kết nối tới {profile.name} qua {target}.\nChi tiết: {result}")
+                return
+
+            ok, msg, endpoint = result
+            if not ok:
+                self.log(f"❌ {msg}")
+                QMessageBox.warning(self, "Lỗi kết nối", f"Không thể kết nối ADB tới {endpoint}.\nVui lòng kiểm tra xem điện thoại có đang mở Wi-Fi/Tailscale không!")
+                return
+
+            self.log(f"✅ {msg}")
+            self.reload_devices(preferred_serial=endpoint)
+
+            # 2. Launch stream with profile specific flags
+            self.launch_stream_for_profile(profile, endpoint)
+
+        self.run_async(connect_task, on_connected)
+
+    def launch_stream_for_profile(self, profile: DeviceProfile, endpoint: str):
+        """Launch Scrcpy stream with customized profile flags."""
+        self.is_stream_manually_stopped = False
+        self.reconnect_attempts = 0
+
+        q_idx = self.combo_quality.currentIndex()
+        res_val = 1080 if q_idx == 0 else (720 if q_idx == 1 else 0)
+        bit_val = "8M" if q_idx == 0 else ("4M" if q_idx == 1 else "16M")
+
+        opts = {
+            "turn_screen_off": self.chk_turn_off.isChecked(),
+            "always_on_top": self.chk_always_top.isChecked(),
+            "stay_awake": self.chk_stay_awake.isChecked(),
+            "max_size": res_val,
+            "bitrate": bit_val,
+            "title": f"DroidMaster // {profile.name}",
+            "extra_args": profile.extra_scrcpy_flags,
+            "no_audio": "--no-audio" in profile.extra_scrcpy_flags
+        }
+
+        # If previous stream is running, terminate it
+        if self.scrcpy_proc and self.scrcpy_proc.poll() is None:
+            self.scrcpy_proc.terminate()
+            self.scrcpy_proc = None
+
+        self.scrcpy_proc = adb_core.launch_scrcpy(endpoint, opts)
+        if self.scrcpy_proc:
+            self.btn_hero_stream.setText("■ DỪNG CHIẾU MÀN HÌNH")
+            self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ef4444, stop:1 #dc2626); color: #ffffff;")
+            self.log(f"🟢 [1-CLICK] Đã bật chiếu màn hình cho {profile.name} ({endpoint}).")
+
+            if not opts.get("turn_screen_off", False):
+                self.run_async(lambda: adb_core.send_keyevent(endpoint, "224"), lambda ok, res: None)
+        else:
+            self.log(f"⚠️ Không thể khởi chạy Scrcpy cho {endpoint}")
+
     def action_toggle_stream(self):
         try:
             # Refresh and verify device presence before launching Scrcpy
@@ -798,6 +963,7 @@ class DroidMasterApp(QMainWindow):
                 return
 
             if self.scrcpy_proc and self.scrcpy_proc.poll() is None:
+                self.is_stream_manually_stopped = True
                 self.scrcpy_proc.terminate()
                 self.scrcpy_proc = None
                 self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
@@ -807,9 +973,16 @@ class DroidMasterApp(QMainWindow):
                     target_ser = self.active_serial
                     self.run_async(lambda: adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "false"], serial=target_ser), lambda ok, res: None)
             else:
+                self.is_stream_manually_stopped = False
+                self.reconnect_attempts = 0
+
                 q_idx = self.combo_quality.currentIndex()
                 res_val = 1080 if q_idx == 0 else (720 if q_idx == 1 else 0)
                 bit_val = "8M" if q_idx == 0 else ("4M" if q_idx == 1 else "16M")
+
+                prof = self.active_profile
+                extra_args = prof.extra_scrcpy_flags if prof else []
+                no_audio = "--no-audio" in extra_args if prof else False
 
                 opts = {
                     "turn_screen_off": self.chk_turn_off.isChecked(),
@@ -817,7 +990,9 @@ class DroidMasterApp(QMainWindow):
                     "stay_awake": self.chk_stay_awake.isChecked(),
                     "max_size": res_val,
                     "bitrate": bit_val,
-                    "title": f"DroidMaster // {self.lbl_device_model.text()}"
+                    "title": f"DroidMaster // {self.lbl_device_model.text()}",
+                    "extra_args": extra_args,
+                    "no_audio": no_audio
                 }
 
                 self.scrcpy_proc = adb_core.launch_scrcpy(self.active_serial, opts)
@@ -841,16 +1016,62 @@ class DroidMasterApp(QMainWindow):
 
     def monitor_scrcpy_process(self):
         try:
-            if self.scrcpy_proc != None and self.scrcpy_proc.poll() is not None:
+            if self.scrcpy_proc is not None and self.scrcpy_proc.poll() is not None:
                 self.scrcpy_proc = None
-                self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
-                self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
-                self.log("⏹️ Cửa sổ chiếu màn hình Scrcpy đã đóng.")
-                if self.active_serial:
+
+                # 1. If manually stopped by user, cleanup gracefully
+                if self.is_stream_manually_stopped:
+                    self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
+                    self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
+                    self.log("⏹️ Cửa sổ chiếu màn hình Scrcpy đã đóng.")
+                    if self.active_serial:
+                        target_ser = self.active_serial
+                        self.run_async(lambda: adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "false"], serial=target_ser), lambda ok, res: None)
+                    return
+
+                # 2. Unexpected termination: Trigger Silent Auto-Reconnect
+                prof = self.active_profile
+                should_reconnect = prof.auto_reconnect if prof else True
+                max_retries = prof.max_reconnect_attempts if prof else 3
+
+                if should_reconnect and self.reconnect_attempts < max_retries and self.active_serial:
+                    self.reconnect_attempts += 1
                     target_ser = self.active_serial
-                    self.run_async(lambda: adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "false"], serial=target_ser), lambda ok, res: None)
-        except Exception:
-            pass
+                    self.log(f"⚠️ Mất kết nối stream! Đang tự động kết nối lại (Lần {self.reconnect_attempts}/{max_retries})...")
+                    self.btn_hero_stream.setText(f"🔄 ĐANG KẾT NỐI LẠI ({self.reconnect_attempts}/{max_retries})...")
+                    self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #f59e0b, stop:1 #d97706); color: #ffffff;")
+
+                    def retry_task():
+                        time.sleep(1.2)
+                        if ":" in target_ser:
+                            ok, _ = adb_core.connect_endpoint(target_ser, timeout=3)
+                            return ok
+                        return True
+
+                    def on_retry_done(success, ok):
+                        if ok:
+                            self.log("🔄 Thiết bị đã phản hồi, đang khôi phục màn hình chiếu...")
+                            if prof:
+                                self.launch_stream_for_profile(prof, target_ser)
+                            else:
+                                self.action_toggle_stream()
+                        else:
+                            self.log(f"⚠️ Thử kết nối lại lần {self.reconnect_attempts} chưa thành công.")
+                            if self.reconnect_attempts >= max_retries:
+                                self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
+                                self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
+                                self.log("❌ Đã hết số lần thử lại tự động. Vui lòng kiểm tra Wi-Fi / Tailscale trên điện thoại.")
+
+                    self.run_async(retry_task, on_retry_done)
+                else:
+                    self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
+                    self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
+                    self.log("⏹️ Cửa sổ chiếu màn hình Scrcpy đã đóng.")
+                    if self.active_serial:
+                        target_ser = self.active_serial
+                        self.run_async(lambda: adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "false"], serial=target_ser), lambda ok, res: None)
+        except Exception as e:
+            self.log(f"⚠️ Lỗi giám sát tiến trình: {e}")
 
     def action_wake_screen(self):
         if not self.active_serial:

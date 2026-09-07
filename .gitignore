@@ -25,10 +25,11 @@ venv/
 .venv/
 env/
 
-# Application Generated / Screenshots
+# Application Generated / Screenshots / User Config
 screenshots/
 Pictures/
 captures/
+profiles.json
 
 # IDE / Editor files
 .idea/

@@ -1,17 +1,17 @@
-# ⚡ DroidMaster Pro v2.8.6 — Universal Android Control Center (Quick IP / Tailscale Switcher & Auto-Reconnect)
+# ⚡ DroidMaster Pro v2.9.0 — Universal Android Control Center (Smart Profiles, 1-Click Remote & Auto-Reconnect)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Toggle đổi nhanh IP Wi-Fi/Tailscale tức thì • Cẩm nang HTML gắn sẵn không mở browser • Kiến trúc Enterprise v2.8.6</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Danh bạ thiết bị thông minh (Smart Profiles) • Kết nối 1-Click tự động phân giải lộ trình • Tự động kết nối lại khi đứt mạng • Kiến trúc v2.9.0</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.8.6%20(Quick%20IP%20Switcher)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.6" />
-  <img src="https://img.shields.io/badge/Tests-21%2F21%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 21/21 Passing" />
+  <img src="https://img.shields.io/badge/Version-v2.9.0%20(Smart%20Profiles)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.9.0" />
+  <img src="https://img.shields.io/badge/Tests-32%2F32%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 32/32 Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
   <img src="https://img.shields.io/badge/Mirror-Scrcpy%204.1-FF6B6B?style=for-the-badge" alt="Scrcpy 4.1" />
@@ -22,18 +22,20 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.6 (Quick IP / Tailscale Switcher)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.9.0 (Smart Profiles & Resilient Auto-Reconnect)
 
-Phiên bản **v2.8.6** bổ sung công cụ chuyển đổi nhanh địa chỉ IP Wi-Fi và mạng ngoài Tailscale linh hoạt:
+Phiên bản **v2.9.0** mang đến bước nhảy vọt về trải nghiệm người dùng với mô hình quản trị thiết bị đa điểm:
 
-* ⚙️ **Nút Toggle "Đổi IP" Trực Tiếp Trên Thẻ Wi-Fi (Quick IP Switcher):**
-  Tích hợp nút nhỏ màu cam `⚙️ Đổi IP` ngay trên góc phải thẻ **"Không Dây Wi-Fi"**. Cho phép người dùng đổi sang dải mạng Wi-Fi mới hoặc nhập địa chỉ Tailscale VPN (`100.x.y.z`) bất kỳ lúc nào chỉ với 1 click.
-* 🔄 **Tự Động Ngắt Endpoint Cũ Khi Đổi IP (`adb disconnect`):**
-  Khi chuyển đổi IP, hệ thống tự động giải phóng endpoint Wi-Fi cũ qua `adb_core.disconnect_endpoint()`, triệt tiêu hoàn toàn tình trạng thiết bị cũ còn sót lại gây xung đột hoặc báo lỗi offline.
-* 💬 **Hộp Thoại Chuyển Đổi Thông Minh Thay Vì Chặn Báo Lỗi:**
-  Khi thiết bị đã kết nối Wi-Fi sẵn, nếu người dùng bấm nút "Bật kết nối Wi-Fi", ứng dụng không còn chặn bằng hộp thoại thông báo tĩnh mà lịch sự hỏi: *"Anh có muốn đổi sang địa chỉ IP khác (mạng Wi-Fi mới hoặc Tailscale) không?"*.
-* 🧪 **Bộ Kiểm Thử Mở Rộng Lên 21 Unit Tests (100% Pass):**
-  Bổ sung unit test `test_disconnect_endpoint` kiểm thử ngắt kết nối cho từng endpoint hoặc toàn bộ hệ thống.
+* 📋 **Danh Bạ Thiết Bị Thông Minh (Smart Device Profiles):**
+  Lưu trữ hồ sơ thiết bị vào file JSON cục bộ bảo mật (`profiles.json`). Mỗi thiết bị lưu kèm: Tên gợi nhớ, Mã hiệu máy, Serial cáp USB, IP mạng Wi-Fi LAN và IP Tailscale VPN, cùng cờ Scrcpy riêng biệt. Tích hợp sẵn cấu hình mẫu cho POCO F1 điều khiển từ xa.
+* ⚡ **Kết Nối 1-Click (1-Click Smart Connection):**
+  Người dùng chỉ cần chọn máy từ danh bạ và bấm `⚡ KẾT NỐI NHANH (1-CLICK)`. DroidMaster Pro tự động phân giải lộ trình tối ưu: **Kiểm tra cáp USB $\rightarrow$ Ping thử IP LAN $\rightarrow$ Kết nối qua IP Tailscale VPN**, kết nối ADB và kích hoạt màn hình chiếu ngay tức khắc mà không cần nhớ hay gõ bất kỳ địa chỉ IP nào.
+* 🔄 **Tự Động Kết Nối Lại Khi Đứt Mạng (Silent Auto-Reconnect Engine):**
+  Khi luồng stream bị ngắt đột ngột do mạng 4G/Wi-Fi chập chờn, hệ thống tự động nhận diện và kích hoạt chu trình thử lại (tối đa 3 lần với cơ chế exponential pause), xác thực lại daemon ADB và khởi động lại Scrcpy trong im lặng mà người dùng không cần bấm lại nút.
+* 🔇 **Tối Ưu Riêng Biệt Từng Dòng Máy (Device-Specific Flags):**
+  Hỗ trợ lưu cấu hình riêng cho từng model, điển hình là cờ `--no-audio` tự động cho Android 10 (POCO F1) giúp khắc phục triệt để lỗi không khởi chạy được âm thanh hoặc giật hình.
+* 🧪 **Bộ Kiểm Thử Mở Rộng Đạt 32 Unit Tests (100% Pass):**
+  Bổ sung trọn vẹn test suite `tests/test_device_manager.py` bao quát mô hình dữ liệu, cơ chế lưu trữ JSON, ma trận phân giải lộ trình, tùy chọn khởi chạy Scrcpy và vòng đời giao diện Modal Dialog.
 
 * 📖 **Cẩm Nang & Hướng Dẫn Sử Dụng Gắn Sẵn (In-App HTML Knowledge Base):**
   Tích hợp nguyên khối tài liệu hướng dẫn chuẩn giao diện Dark Obsidian vào bên trong ứng dụng PySide6 qua `QTextBrowser`, mở tức thì bằng 1-click nút `📖 HƯỚNG DẪN SỬ DỤNG` mà **hoàn toàn không cần mở trình duyệt web ngoài (Chrome/Edge)**.

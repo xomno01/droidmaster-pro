@@ -12,7 +12,8 @@ Chúng tôi cam kết phát hành các bản vá bảo mật và cập nhật k�
 
 | Phiên bản | Trạng thái hỗ trợ | Ghi chú |
 | :--- | :--- | :--- |
-| **v2.8.x (Production-Grade & Responsive UI)** | ✅ Đang hỗ trợ chính thức | Phiên bản kiến trúc Zero-Eval, Responsive Bento Layout, Real CPU Telemetry, In-Memory Streaming |
+| **v2.9.x (Smart Profiles & Resilient Remote)** | ✅ Đang hỗ trợ chính thức | Phiên bản Danh bạ thiết bị, 1-Click Remote, Silent Auto-Reconnect, Tối ưu hóa Model |
+| **v2.8.x (Production-Grade & Responsive UI)** | ⚠️ Hỗ trợ bảo trì | Phiên bản kiến trúc Zero-Eval, Responsive Bento Layout, Real CPU Telemetry |
 | **v2.7.x (Production-Grade Hardening)** | ⚠️ Hỗ trợ bảo trì | Tiếp nhận bản vá an ninh quan trọng |
 | < v2.7.0 | ❌ Ngừng hỗ trợ | Khuyến nghị nâng cấp lên v2.8.0+ |
 

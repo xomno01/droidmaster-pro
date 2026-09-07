@@ -615,6 +615,14 @@ def launch_scrcpy(serial: str, options: Dict) -> Optional[subprocess.Popen]:
     cmd.extend(["--window-title", title])
     cmd.extend(["--window-width", "420"])
 
+    if options.get("no_audio", False):
+        if "--no-audio" not in cmd:
+            cmd.append("--no-audio")
+
+    for extra in options.get("extra_args", []):
+        if extra and extra not in cmd:
+            cmd.append(extra)
+
     try:
         scrcpy_dir = os.path.dirname(os.path.abspath(SCRCPY_PATH)) if (SCRCPY_PATH and os.path.exists(SCRCPY_PATH)) else (BIN_DIR if BIN_DIR else None)
         proc = subprocess.Popen(
