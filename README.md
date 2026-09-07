@@ -1,17 +1,17 @@
-# ⚡ DroidMaster Pro v2.8.4 — Universal Android Control Center (Persistent Wireless Auto-Reconnect)
+# ⚡ DroidMaster Pro v2.8.5 — Universal Android Control Center (In-App HTML Guide & Dual-Screen Sync)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Tự động quét & kết nối lại Wi-Fi vĩnh viễn không cần cáp • Kiến trúc Enterprise v2.8.4</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Cẩm nang HTML gắn sẵn không mở browser • Đồng bộ song song 2 màn hình thời gian thực • Kiến trúc Enterprise v2.8.5</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.8.4%20(Auto--Reconnect)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.4" />
-  <img src="https://img.shields.io/badge/Tests-18%2F18%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 18/18 Passing" />
+  <img src="https://img.shields.io/badge/Version-v2.8.5%20(HTML%20Guide%20%26%20Sync)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.5" />
+  <img src="https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 20/20 Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
   <img src="https://img.shields.io/badge/Mirror-Scrcpy%204.1-FF6B6B?style=for-the-badge" alt="Scrcpy 4.1" />
@@ -22,9 +22,24 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.4 (Persistent Wireless Auto-Reconnect)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.5 (In-App HTML Guide & Dual-Screen Sync)
 
-Phiên bản **v2.8.4** mang tới bước đột phá loại bỏ hoàn toàn nhu cầu cắm cáp USB cho các phiên sử dụng tiếp theo:
+Phiên bản **v2.8.5** bổ sung cẩm nang hướng dẫn toàn diện tích hợp nguyên khối trong ứng dụng và tối ưu trải nghiệm đồng bộ hiển thị màn hình thực tế:
+
+* 📖 **Cẩm Nang & Hướng Dẫn Sử Dụng Gắn Sẵn (In-App HTML Knowledge Base):**
+  Tích hợp nguyên khối tài liệu hướng dẫn chuẩn giao diện Dark Obsidian vào bên trong ứng dụng PySide6 qua `QTextBrowser`, mở tức thì bằng 1-click nút `📖 HƯỚNG DẪN SỬ DỤNG` mà **hoàn toàn không cần mở trình duyệt web ngoài (Chrome/Edge)**.
+  - Hướng dẫn bật ADB & Tùy chọn nhà phát triển theo từng dòng máy cụ thể: **Xiaomi / POCO / Redmi** (MIUI & HyperOS, các bước cấp quyền bắt buộc *Install via USB* và *Security settings*), **Samsung Galaxy** (One UI), **OPPO & Realme** (ColorOS), **Vivo & iQOO**, **Google Pixel & Pure Android**, **Huawei & Honor**.
+  - Hướng dẫn kết nối Wi-Fi cùng mạng LAN và kết nối từ xa toàn cầu qua VPN Mesh Tailscale.
+  - Bảng phím tắt điều khiển Scrcpy chuyên nghiệp (`Alt + F`, `Alt + Shift + O`, `Alt + H`, `Alt + B`, kéo thả APK...).
+  - Ô tìm kiếm nhanh từ khóa (Search bar) và Mục lục điều hướng (Table of Contents) nhảy anchor tức thì.
+
+* 🖥️ **Đồng Bộ Song Song Hai Màn Hình Thời Gian Thực (Dual-Screen Sync):**
+  - Mặc định giữ màn hình điện thoại và máy tính luôn sáng song song thực tế theo thời gian thực (tùy chọn "Tắt màn hình máy (Tiết kiệm pin)" chuyển sang mặc định tắt).
+  - Tự động kích hoạt `svc power stayon true` trong lúc stream để ngăn điện thoại tự động tắt màn hình / rơi vào chế độ ngủ sâu (Deep Sleep) ngay cả khi stream không dây qua Wi-Fi không cắm cáp.
+  - Phím tắt `Alt + Shift + O` trên màn hình chiếu và nút **💡 Sáng màn hình máy (Wake Up)** trên thanh điều khiển giúp đánh thức và bật sáng màn hình điện thoại tức thì bất cứ lúc nào.
+
+* 🧪 **Bộ Kiểm Thử Mở Rộng Lên 20 Unit Tests (100% Pass):**
+  Bổ sung bộ test tự động xác thực toàn bộ anchor HTML, từ khóa hướng dẫn từng dòng máy và khởi tạo hộp thoại hướng dẫn.
 
 * 📶 **Khởi Động Tự Động Quét & Kết Nối Wi-Fi (Persistent Auto-Reconnect):**
   Lưu trữ an toàn endpoint thiết bị Wi-Fi gần nhất (`config.json`). Mỗi khi người dùng mở DroidMaster Pro lên (ngay cả khi **hoàn toàn không cắm bất kỳ sợi dây cáp USB nào**), ứng dụng tự động phát hiện và kết nối lại thiết bị qua Wi-Fi trong vòng **< 1 giây**. Thiết bị lập tức chuyển sang trạng thái `ONLINE` trên combobox sẵn sàng điều khiển.

@@ -22,6 +22,7 @@ from PySide6.QtGui import QFont, QCursor, QIcon
 
 import adb_core
 from styles import DARK_THEME_QSS
+from guide_dialog import UserGuideDialog
 
 class AsyncWorker(QThread):
     finished = Signal(bool, object)
@@ -145,7 +146,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.8.4")
+        lbl_ver = QLabel("v2.8.5")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -153,6 +154,13 @@ class DroidMasterApp(QMainWindow):
         brand_row.addWidget(lbl_ver)
         brand_row.addStretch()
         side_layout.addLayout(brand_row)
+
+        btn_guide = QPushButton("📖 HƯỚNG DẪN SỬ DỤNG")
+        btn_guide.setObjectName("btnUserGuide")
+        btn_guide.setCursor(QCursor(Qt.PointingHandCursor))
+        btn_guide.setToolTip("Mở cẩm nang hướng dẫn bật ADB theo từng dòng máy và sử dụng toàn bộ tính năng")
+        btn_guide.clicked.connect(self.open_user_guide)
+        side_layout.addWidget(btn_guide)
 
         # 2. Device Selector Dropdown
         dev_sel_box = QVBoxLayout()
@@ -245,6 +253,7 @@ class DroidMasterApp(QMainWindow):
             ("●", "Trang chính (Home)", lambda: self.send_key("3")),
             ("■", "Đa nhiệm (Recents)", lambda: self.send_key("187")),
             ("🔔", "Hạ thanh thông báo", self.action_pull_notifications),
+            ("💡", "Bật sáng màn hình máy (Wake Up)", self.action_wake_screen),
             ("🔒", "Khóa / Mở nguồn (Power)", lambda: self.send_key("26")),
             ("🔉", "Giảm âm", lambda: self.send_key("25")),
             ("🔊", "Tăng âm", lambda: self.send_key("24")),
@@ -341,8 +350,13 @@ class DroidMasterApp(QMainWindow):
         toggles_grid.setHorizontalSpacing(10)
         toggles_grid.setVerticalSpacing(6)
 
-        self.chk_turn_off = QCheckBox("Tắt màn hình máy")
-        self.chk_turn_off.setToolTip("Tắt màn hình điện thoại để chống nóng máy")
+        self.chk_turn_off = QCheckBox("Tắt màn hình máy (Tiết kiệm pin)")
+        self.chk_turn_off.setChecked(False)
+        self.chk_turn_off.setToolTip(
+            "Nếu BẬT: Màn hình điện thoại sẽ tắt đen để chống nóng máy (chỉ xem trên máy tính).\n"
+            "Phím tắt: Alt+Shift+O trên màn hình chiếu để bật sáng lại màn hình điện thoại.\n"
+            "Nếu TẮT: Cả màn hình điện thoại và máy tính sẽ cùng sáng song song thực tế."
+        )
         self.chk_always_top = QCheckBox("Ghim trên cùng")
         self.chk_always_top.setToolTip("Luôn ghim cửa sổ trên cùng (Always on Top)")
         self.chk_always_top.setChecked(True)
@@ -354,6 +368,12 @@ class DroidMasterApp(QMainWindow):
         toggles_grid.addWidget(self.chk_always_top, 0, 1)
         toggles_grid.addWidget(self.chk_stay_awake, 1, 0)
         hero_layout.addLayout(toggles_grid)
+
+        # Screen Sync Tip Banner
+        lbl_screen_tip = QLabel("💡 Mẹo: Muốn điện thoại và máy tính cùng sáng song song, hãy BỎ TÍCH 'Tắt màn hình máy'. Phím tắt: Alt+Shift+O để bật lại màn hình điện thoại bất kỳ lúc nào.")
+        lbl_screen_tip.setStyleSheet("font-size: 11px; color: #38bdf8; line-height: 1.3;")
+        lbl_screen_tip.setWordWrap(True)
+        hero_layout.addWidget(lbl_screen_tip)
 
         # 4. Stream Quality Row (spans full card width cleanly)
         quality_box = QHBoxLayout()
@@ -518,7 +538,7 @@ class DroidMasterApp(QMainWindow):
         root_layout.addWidget(self.scroll, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.8.4 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.8.5 sẵn sàng.")
 
     def eventFilter(self, watched, event):
         if hasattr(self, 'scroll') and watched == self.scroll.viewport():
@@ -748,6 +768,13 @@ class DroidMasterApp(QMainWindow):
             self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
             self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
             self.log("⏹️ Đã tắt cửa sổ chiếu màn hình.")
+            if self.active_serial:
+                threading.Thread(
+                    target=adb_core.run_adb_raw,
+                    args=(["shell", "svc", "power", "stayon", "false"],),
+                    kwargs={"serial": self.active_serial},
+                    daemon=True
+                ).start()
         else:
             q_idx = self.combo_quality.currentIndex()
             res_val = 1080 if q_idx == 0 else (720 if q_idx == 1 else 0)
@@ -767,6 +794,15 @@ class DroidMasterApp(QMainWindow):
                 self.btn_hero_stream.setText("■ DỪNG CHIẾU MÀN HÌNH")
                 self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #ef4444, stop:1 #dc2626); color: #ffffff;")
                 self.log(f"🟢 Đã bật chiếu màn hình cho {self.lbl_device_model.text()} ({self.active_serial}).")
+
+                # If user wants both screens on (turn_screen_off unchecked), ensure device screen is awake
+                target_ser = self.active_serial
+                if not opts.get("turn_screen_off", False):
+                    def wake_task():
+                        adb_core.send_keyevent(target_ser, "224")  # KEYCODE_WAKEUP
+                        if opts.get("stay_awake", True):
+                            adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "true"], serial=target_ser)
+                    threading.Thread(target=wake_task, daemon=True).start()
             else:
                 QMessageBox.critical(self, "Lỗi", "Không thể bật Scrcpy. Hãy kiểm tra kết nối thiết bị!")
 
@@ -776,6 +812,31 @@ class DroidMasterApp(QMainWindow):
             self.btn_hero_stream.setText("▶ BẬT CHIẾU MÀN HÌNH")
             self.btn_hero_stream.setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:1 #059669); color: #ffffff;")
             self.log("⏹️ Cửa sổ chiếu màn hình Scrcpy đã đóng.")
+            if self.active_serial:
+                threading.Thread(
+                    target=adb_core.run_adb_raw,
+                    args=(["shell", "svc", "power", "stayon", "false"],),
+                    kwargs={"serial": self.active_serial},
+                    daemon=True
+                ).start()
+
+    def action_wake_screen(self):
+        if not self.active_serial:
+            return
+        target_ser = self.active_serial
+        def task():
+            adb_core.send_keyevent(target_ser, "224")  # KEYCODE_WAKEUP
+            time.sleep(0.08)
+            adb_core.send_keyevent(target_ser, "82")   # KEYCODE_MENU (unlock)
+        threading.Thread(target=task, daemon=True).start()
+        self.log("💡 Đã gửi tín hiệu đánh thức màn hình điện thoại (Wake Up).")
+
+    def open_user_guide(self):
+        if not hasattr(self, "_guide_dialog") or self._guide_dialog is None:
+            self._guide_dialog = UserGuideDialog(self)
+        self._guide_dialog.show()
+        self._guide_dialog.raise_()
+        self._guide_dialog.activateWindow()
 
     def send_key(self, code):
         if not self.active_serial:

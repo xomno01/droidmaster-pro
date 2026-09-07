@@ -205,6 +205,23 @@ QPushButton#stopBtn:hover {
     background: #f87171;
 }
 
+/* User Guide Button (Indigo / Violet Gradient) */
+QPushButton#btnUserGuide {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #4f46e5, stop:1 #7c3aed);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 6px 12px;
+    min-height: 32px;
+}
+
+QPushButton#btnUserGuide:hover {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #6366f1, stop:1 #8b5cf6);
+    border-color: #a78bfa;
+}
+
 /* Action Card Button (Modern Tile Button) */
 QPushButton#actionTileBtn {
     background-color: #162032;

@@ -618,5 +618,50 @@ class TestCyberDroid(unittest.TestCase):
             self.assertFalse(success)
 
 
+class TestGuideDialog(unittest.TestCase):
+    """Unit tests for the integrated in-app user guide."""
+
+    def test_guide_html_anchors_and_content(self):
+        import guide_dialog
+        html = guide_dialog.GUIDE_HTML
+
+        expected_anchors = [
+            "sec_quickstart",
+            "sec_xiaomi",
+            "sec_samsung",
+            "sec_oppo",
+            "sec_vivo",
+            "sec_pixel",
+            "sec_huawei",
+            "sec_wifi",
+            "sec_stream",
+            "sec_features",
+            "sec_faq",
+        ]
+        for anchor in expected_anchors:
+            self.assertIn(f'name="{anchor}"', html, f"Anchor {anchor} missing in GUIDE_HTML!")
+
+        # Check critical troubleshooting & brand instructions
+        self.assertIn("Xiaomi", html)
+        self.assertIn("POCO", html)
+        self.assertIn("HyperOS", html)
+        self.assertIn("Samsung", html)
+        self.assertIn("One UI", html)
+        self.assertIn("Alt + Shift + O", html)
+        self.assertIn("5555", html)
+        self.assertIn("Tailscale", html)
+
+    def test_guide_dialog_instantiation(self):
+        from PySide6.QtWidgets import QApplication
+        import guide_dialog
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        dialog = guide_dialog.UserGuideDialog()
+        self.assertIsNotNone(dialog)
+        self.assertEqual(len(dialog.sections_map), 11)
+        self.assertEqual(dialog.toc_list.count(), 11)
+        dialog.close()
+
+
 if __name__ == "__main__":
     unittest.main()
