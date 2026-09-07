@@ -1,16 +1,16 @@
-# ⚡ DroidMaster Pro v2.9.3 — Universal Android Control Center (Android 11+ Wireless mDNS & Responsive UX)
+# ⚡ DroidMaster Pro v2.9.4 — Universal Android Control Center (Android 15 FLAG_SECURE Unlock & Spacious 2x5 NavDock)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Danh bạ thiết bị thông minh (Smart Profiles) • Auto-Discovery Gỡ Lỗi Không Dây Android 11+ (mDNS TLS) • Popup Animation Kết Nối Nhanh • Kiến trúc v2.9.3</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Danh bạ thiết bị thông minh (Smart Profiles) • Auto-Discovery Gỡ Lỗi Không Dây Android 11+ (mDNS TLS) • Android 15 PIN Unlock • Bố cục Dock 2x5 Thoáng Đãng • Kiến trúc v2.9.4</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.9.3%20(Wireless%20mDNS)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.9.3" />
+  <img src="https://img.shields.io/badge/Version-v2.9.4%20(Spacious%202x5%20Dock)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.9.4" />
   <img src="https://img.shields.io/badge/Tests-41%2F41%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 41/41 Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
@@ -22,9 +22,14 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.9.3 (Wireless mDNS & Readable Error UX)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.9.4 (Android 15 PIN Unlock & Spacious 2x5 NavDock)
 
-Phiên bản **v2.9.3** giải quyết triệt để vấn đề gỡ lỗi không dây trên Android 11+ và hoàn thiện độ sắc nét của giao diện báo lỗi:
+Phiên bản **v2.9.4** nâng cấp trải nghiệm người dùng, giải quyết cơ chế bảo mật màn hình đen Android 15 và tái kiến trúc thanh công cụ điều hướng:
+
+* 🔓 **Giải Pháp Vượt Màn Hình Đen & Mở Khóa PIN Android 15 (`FLAG_SECURE` Unlock Engine):**
+  Trên Android 15 (Lenovo Tab TB320FC...), giao diện nhập PIN/Mật khẩu khóa máy được hệ điều hành áp dụng cờ bảo mật phần cứng `FLAG_SECURE`, làm luồng stream Scrcpy hiển thị màu đen để chống ghi lại mật mã. DroidMaster Pro bổ sung cơ chế mở khóa nhanh qua nút `🔓` trên thanh điều khiển hoặc phím vật lý máy tính: tự động gửi `KEYCODE_WAKEUP` $\rightarrow$ gạt màn hình khóa `wm dismiss-keyguard` $\rightarrow$ nhập mã PIN an toàn $\rightarrow$ gửi `ENTER` mở khóa tức thì, giúp khôi phục hình ảnh stream 60FPS ngay sau khi vào màn hình chính.
+* 🎨 **Tái Thiết Kế Dock Điều Hướng `navDock` 2x5 (Xóa Bỏ Triệt Để Lỗi Biểu Tượng Bị Ép Dẹp):**
+  Khắc phục triệt để hiện tượng 9 nút điều hướng bị ép dẹp thành các vạch mỏng ("con ma ốm đói") khi nằm trong sidebar 280px. Bố cục lại thành dạng lưới 2 hàng × 5 cột (`QGridLayout`), định kiểu CSS riêng biệt `QPushButton.navBtn` (`padding: 0px`, `min-height: 36px`, `font-size: 16px`). Biểu tượng hiển thị to, tròn, căng đầy, rõ ràng 100%, bổ sung nút chụp màn hình nhanh `📸`.
 
 * 📡 **Tự Động Nhận Diện Gỡ Lỗi Không Dây Android 11+ Qua mDNS (Auto-Discovery TLS):**
   Trên các dòng Android mới (Android 11, 12, 13, 14), Google không mở cổng cố định 5555 mà phát sinh cổng động ngẫu nhiên (dynamic port). DroidMaster Pro tự động phân giải dịch vụ mạng `_adb-tls-connect._tcp` qua lệnh mDNS, khớp chính xác số serial phần cứng (`HA201ZLA`) và tự động kết nối vào cổng động hiện thời mà người dùng không cần dò tìm thủ công!
