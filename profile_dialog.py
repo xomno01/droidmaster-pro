@@ -368,15 +368,47 @@ class ProfileDialog(QDialog):
     def on_fetch_usb_serial(self):
         try:
             devs = adb_core.list_devices()
-            usb_devs = [d for d in devs if d.get("type") == "USB" and d.get("state") == "device"]
-            if usb_devs:
-                target = usb_devs[0]
+            all_usb = [d for d in devs if d.get("type") == "USB"]
+            authorized_usb = [d for d in all_usb if d.get("state") == "device"]
+            unauthorized_usb = [d for d in all_usb if d.get("state") == "unauthorized"]
+            offline_usb = [d for d in all_usb if d.get("state") == "offline"]
+
+            if authorized_usb:
+                target = authorized_usb[0]
                 self.txt_usb.setText(target["serial"])
                 if not self.txt_model.text():
                     self.txt_model.setText(target.get("model", ""))
-                QMessageBox.information(self, "Thành công", f"Đã nhận diện thiết bị USB: {target.get('model')} ({target['serial']})")
+                QMessageBox.information(self, "Thành công", f"Đã nhận diện thiết bị USB:\n• Model: {target.get('model')}\n• Serial: {target['serial']}")
+            elif unauthorized_usb:
+                target = unauthorized_usb[0]
+                self.txt_usb.setText(target["serial"])
+                QMessageBox.warning(
+                    self,
+                    "Cần Cấp Quyền Trên Điện Thoại (Unauthorized)",
+                    f"Máy tính đã nhận diện thiết bị USB [{target['serial']}] nhưng điện thoại CHƯA CHO PHÉP KẾT NỐI!\n\n"
+                    "👉 Anh vui lòng mở sáng màn hình điện thoại, kiểm tra hộp thoại:\n"
+                    "'Cho phép gỡ lỗi USB? (Allow USB debugging?)'\n"
+                    "Tích chọn 'Luôn cho phép từ máy tính này' rồi bấm [OK/Cho phép], sau đó bấm lại nút này."
+                )
+            elif offline_usb:
+                target = offline_usb[0]
+                QMessageBox.warning(
+                    self,
+                    "Thiết Bị Đang Offline",
+                    f"Thiết bị [{target['serial']}] đang ở trạng thái Offline.\n"
+                    "👉 Anh vui lòng rút cáp USB cắm lại hoặc khởi động lại điện thoại."
+                )
             else:
-                QMessageBox.warning(self, "Thông báo", "Không tìm thấy thiết bị nào đang cắm cáp USB!")
+                QMessageBox.warning(
+                    self,
+                    "Chưa Nhận Diện Tín Hiệu USB",
+                    "Máy tính chưa nhận được tín hiệu ADB từ điện thoại qua cáp USB.\n\n"
+                    "🔍 Anh vui lòng kiểm tra nhanh 4 nguyên nhân thực tế:\n"
+                    "1. Chưa bật 'Gỡ lỗi USB': Trên điện thoại vào Cài đặt > Tùy chọn nhà phát triển > Bật 'Gỡ lỗi USB' (USB Debugging).\n"
+                    "2. Cáp sạc chỉ có 2 dây: Một số sợi cáp chỉ dùng để sạc pin, không có 2 dây truyền dữ liệu (Data sync).\n"
+                    "3. Đang ở chế độ 'Chỉ sạc': Vuốt thanh thông báo từ đỉnh màn hình điện thoại xuống > chọn 'Truyền tệp (MTP)'.\n"
+                    "4. Thử cắm cáp sang cổng USB khác trực tiếp trên thân máy tính (không qua cổng chia hub)."
+                )
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", f"Không thể lấy serial USB: {e}")
 
