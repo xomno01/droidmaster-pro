@@ -11,6 +11,7 @@ import sys
 import time
 import subprocess
 import threading
+from typing import Optional, List, Dict, Any, Tuple
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QSize, QEvent, QObject, QRunnable, QThreadPool
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
