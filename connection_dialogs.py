@@ -6,8 +6,9 @@ Provides:
 2. TailscaleOnboardingDialog: Friendly guide shown when USB stream launches, explaining remote setup with Tailscale.
 """
 
+import time
 from typing import Optional, Callable
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import Qt, QTimer, Signal, QThread
 from PySide6.QtGui import QCursor, QFont
 from PySide6.QtWidgets import (
     QDialog,
@@ -22,8 +23,124 @@ from PySide6.QtWidgets import (
     QScrollArea,
 )
 
-from device_manager import DeviceProfile
+from device_manager import DeviceProfile, device_manager
 import adb_core
+
+
+class ConnectionWorker(QThread):
+    """
+    Dedicated background worker thread for 1-click connection.
+    Emits native Qt signals to guarantee thread-safe GUI updates without freezing.
+    """
+    stage_updated = Signal(int, int, str, str)  # stage, target_pct, message, detail
+    route_resolved = Signal(str, str)          # route_type, target
+    connect_failed = Signal(str, str, bool)    # title, detail, can_retry
+    connect_succeeded = Signal(str, str)       # target, route_type
+
+    def __init__(self, profile: DeviceProfile, parent=None):
+        super().__init__(parent)
+        self.profile = profile
+        self.is_cancelled = False
+
+    def cancel(self):
+        self.is_cancelled = True
+
+    def run(self):
+        if self.is_cancelled:
+            return
+
+        # 1. Start resolving route (25%)
+        self.stage_updated.emit(1, 25, "Đang kiểm tra cổng kết nối...", "")
+        time.sleep(0.2)
+        if self.is_cancelled:
+            return
+
+        # Query currently connected devices via ADB
+        devs = adb_core.list_devices()
+        connected = [d["serial"] for d in devs if d.get("state") == "device"]
+        unauthorized = [d["serial"] for d in devs if d.get("state") == "unauthorized"]
+
+        # Check if USB serial matches an unauthorized device
+        if self.profile.usb_serial and self.profile.usb_serial in unauthorized:
+            self.connect_failed.emit(
+                "Thiết bị chưa được cấp quyền (Unauthorized)",
+                f"Thiết bị '{self.profile.name}' ({self.profile.usb_serial}) đang cắm cáp USB nhưng chưa xác nhận cấp quyền gỡ lỗi.\n\n"
+                "👉 Hãy mở khóa màn hình điện thoại/tablet và bấm 'Cho phép' (Allow USB debugging)!",
+                True
+            )
+            return
+
+        route_type, target = device_manager.resolve_best_route(self.profile, connected_serials=connected)
+
+        if not target or self.is_cancelled:
+            self.connect_failed.emit(
+                "Không tìm thấy cổng kết nối",
+                f"Không tìm thấy cáp USB hoặc địa chỉ IP hợp lệ cho '{self.profile.name}'.\n\n"
+                "👉 Hãy cắm lại cáp USB hoặc mở Quản lý danh bạ để kiểm tra IP Tailscale/Wi-Fi.",
+                True
+            )
+            return
+
+        # Emit route info
+        self.route_resolved.emit(route_type, target)
+        self.stage_updated.emit(2, 60, f"Đang kết nối qua [{route_type}] -> {target}...", "")
+
+        if self.is_cancelled:
+            return
+
+        # 2. Connect ADB
+        if ":" in target:
+            ok, msg = adb_core.connect_endpoint(target, timeout=4)
+        else:
+            if target not in connected:
+                ok, msg = False, f"Cáp USB ({target}) không được phát hiện"
+            else:
+                ok, msg = True, "Cáp USB sẵn sàng"
+
+        if self.is_cancelled:
+            return
+
+        if not ok:
+            # Smart contextual diagnostics
+            detail = f"Lỗi: {msg}\n\n"
+            if self.profile.usb_serial and route_type != "USB" and self.profile.usb_serial not in connected:
+                detail += (
+                    f"⚠️ Lưu ý: Máy tính hiện KHÔNG nhận diện được cáp USB ({self.profile.usb_serial}), "
+                    f"nên hệ thống đã tự động thử kết nối qua mạng {route_type} ({target}).\n\n"
+                )
+            if route_type == "Tailscale":
+                detail += (
+                    "💡 Mẹo khắc phục:\n"
+                    "1. Kiểm tra ứng dụng Tailscale trên thiết bị Android có đang BẬT và đăng nhập cùng tài khoản không.\n"
+                    "2. Hoặc cắm lại cáp USB vào máy tính để kết nối có dây trực tiếp tốc độ cao."
+                )
+            elif route_type == "LAN":
+                detail += (
+                    "💡 Mẹo khắc phục:\n"
+                    "1. Kiểm tra điện thoại và máy tính có đang cùng kết nối một mạng Wi-Fi không.\n"
+                    "2. Hoặc cắm lại cáp USB vào máy tính để kết nối."
+                )
+            else:
+                detail += (
+                    "💡 Mẹo khắc phục:\n"
+                    "1. Kiểm tra lại dây cáp USB (thử cắm sang cổng USB khác hoặc đổi dây cáp).\n"
+                    "2. Đảm bảo đã mở khóa màn hình và bật 'Gỡ lỗi USB' (USB Debugging)."
+                )
+
+            self.connect_failed.emit(
+                f"Không thể kết nối qua {route_type}",
+                detail,
+                True
+            )
+            return
+
+        # 3. Connection established!
+        self.stage_updated.emit(3, 85, "Đang khởi tạo đường truyền Scrcpy 60FPS...", "")
+        time.sleep(0.2)
+        if self.is_cancelled:
+            return
+
+        self.connect_succeeded.emit(target, route_type)
 
 
 class ConnectingProgressDialog(QDialog):
@@ -36,10 +153,12 @@ class ConnectingProgressDialog(QDialog):
     cancelled = Signal()
     retry_requested = Signal()
     open_profiles_requested = Signal()
+    connection_succeeded = Signal(str, str)
 
     def __init__(self, parent=None, profile: Optional[DeviceProfile] = None):
         super().__init__(parent)
         self.profile = profile
+        self.worker: Optional[ConnectionWorker] = None
         self.target_progress = 0
         self.current_progress = 0
         self.is_completed = False
@@ -344,36 +463,56 @@ class ConnectingProgressDialog(QDialog):
             self.progress_bar.setValue(self.current_progress)
             self.lbl_percent.setText(f"Connecting... {self.current_progress}%")
 
-    def _on_cancel_clicked(self):
-        self.anim_timer.stop()
-        self.cancelled.emit()
-        self.reject()
+    def start_connection(self):
+        """Start native Qt background worker thread for robust connection lifecycle."""
+        if not self.profile:
+            self.set_error("Thiếu hồ sơ thiết bị", "Vui lòng chọn hoặc tạo một hồ sơ trước.", False)
+            return
 
-    def _on_retry_clicked(self):
         self.is_error = False
         self.error_frame.setVisible(False)
         self.btn_retry.setVisible(False)
         self.btn_manage_profiles.setVisible(False)
         self.btn_cancel.setText("Hủy Bỏ")
         self.current_progress = 0
-        self.target_progress = 10
+        self.target_progress = 15
         self.progress_bar.setValue(0)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                background-color: #1e293b;
-                border: 1px solid rgba(255, 255, 255, 0.05);
-                border-radius: 7px;
-                height: 14px;
-                text-align: center;
-                color: transparent;
-            }
-            QProgressBar::chunk {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #10b981, stop:0.5 #06b6d4, stop:1 #3b82f6);
-                border-radius: 6px;
-            }
-        """)
+        self.lbl_percent.setText("Connecting... 0%")
         self.anim_timer.start(20)
+
+        if self.worker and self.worker.isRunning():
+            self.worker.cancel()
+            self.worker.wait(1000)
+
+        self.worker = ConnectionWorker(self.profile, self)
+        self.worker.stage_updated.connect(self.update_stage)
+        self.worker.route_resolved.connect(self.set_route_info)
+        self.worker.connect_failed.connect(self.set_error)
+        self.worker.connect_succeeded.connect(self._on_worker_succeeded)
+        self.worker.start()
+
+    def _on_worker_succeeded(self, target: str, route_type: str):
+        self.set_success("Kết nối thành công! Đang mở màn hình...")
+        self.connection_succeeded.emit(target, route_type)
+
+    def _on_cancel_clicked(self):
+        if self.worker and self.worker.isRunning():
+            self.worker.cancel()
+            self.worker.wait(1000)
+        self.anim_timer.stop()
+        self.cancelled.emit()
+        self.reject()
+
+    def _on_retry_clicked(self):
         self.retry_requested.emit()
+        self.start_connection()
+
+    def closeEvent(self, event):
+        if self.worker and self.worker.isRunning():
+            self.worker.cancel()
+            self.worker.wait(1000)
+        self.anim_timer.stop()
+        super().closeEvent(event)
 
     def _on_open_profiles_clicked(self):
         self.open_profiles_requested.emit()

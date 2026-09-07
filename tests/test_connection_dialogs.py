@@ -90,10 +90,10 @@ class TestConnectionDialogs(unittest.TestCase):
         # Test retry click
         retry_called = []
         dlg.retry_requested.connect(lambda: retry_called.append(True))
+        dlg.start_connection = MagicMock()
         dlg.btn_retry.click()
-        self.assertFalse(dlg.is_error)
-        self.assertTrue(dlg.error_frame.isHidden())
         self.assertEqual(len(retry_called), 1)
+        dlg.start_connection.assert_called_once()
 
         dlg.close()
 

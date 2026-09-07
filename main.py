@@ -866,87 +866,13 @@ class DroidMasterApp(QMainWindow):
         dlg = ConnectingProgressDialog(self, profile=profile)
         dlg.open_profiles_requested.connect(self.open_profile_manager)
 
-        is_cancelled = False
+        def on_connection_succeeded(endpoint: str, route_type: str):
+            self.log(f"✅ [1-CLICK] Đã kết nối thành công qua [{route_type}] -> {endpoint}")
+            self.reload_devices(preferred_serial=endpoint)
+            self.launch_stream_for_profile(profile, endpoint, route_type=route_type)
 
-        def on_cancel():
-            nonlocal is_cancelled
-            is_cancelled = True
-            self.log(f"⚠️ Đã hủy kết nối tới '{profile.name}'.")
-
-        dlg.cancelled.connect(on_cancel)
-
-        def run_connection_pipeline():
-            nonlocal is_cancelled
-            if is_cancelled:
-                return
-
-            # Step 1: Resolve best route
-            QTimer.singleShot(0, lambda: dlg.update_stage(1, 20))
-            time.sleep(0.25)
-            if is_cancelled:
-                return
-
-            connected = [d["serial"] for d in adb_core.list_devices() if d.get("state") == "device"]
-            route_type, target = device_manager.resolve_best_route(profile, connected_serials=connected)
-
-            if not target or is_cancelled:
-                def on_no_route():
-                    dlg.set_error(
-                        "Không tìm thấy địa chỉ kết nối",
-                        f"Không tìm thấy IP hoặc cáp USB cho '{profile.name}'.\n"
-                        "Vui lòng cắm cáp USB hoặc mở Quản lý danh bạ để kiểm tra IP Tailscale/Wi-Fi."
-                    )
-                QTimer.singleShot(0, on_no_route)
-                return
-
-            # Display route info on dialog
-            QTimer.singleShot(0, lambda: (
-                dlg.set_route_info(route_type, target),
-                dlg.update_stage(2, 55)
-            ))
-            self.log(f"🌐 Lộ trình kết nối: [{route_type}] -> {target}")
-
-            # Step 2: Connect ADB
-            if ":" in target:
-                ok, msg = adb_core.connect_endpoint(target, timeout=5)
-            else:
-                ok, msg = True, "Thiết bị USB sẵn sàng"
-
-            if is_cancelled:
-                return
-
-            if not ok:
-                def on_connect_failed():
-                    dlg.set_error(
-                        f"Không thể kết nối ADB tới {target}",
-                        f"Lỗi: {msg}\n"
-                        "💡 Mẹo: Hãy kiểm tra điện thoại có đang bật Tailscale/Wi-Fi và màn hình đã mở khóa chưa."
-                    )
-                QTimer.singleShot(0, on_connect_failed)
-                return
-
-            # Step 3: Launch Scrcpy stream
-            QTimer.singleShot(0, lambda: (
-                dlg.update_stage(3, 85),
-                self.reload_devices(preferred_serial=target)
-            ))
-            time.sleep(0.3)
-            if is_cancelled:
-                return
-
-            # Finalize on main thread
-            def on_finalize():
-                if is_cancelled:
-                    return
-                dlg.set_success("Kết nối thành công! Đang mở màn hình...")
-                self.launch_stream_for_profile(profile, target, route_type=route_type)
-
-            QTimer.singleShot(0, on_finalize)
-
-        dlg.retry_requested.connect(lambda: threading.Thread(target=run_connection_pipeline, daemon=True).start())
-
-        # Start thread and open modal dialog
-        threading.Thread(target=run_connection_pipeline, daemon=True).start()
+        dlg.connection_succeeded.connect(on_connection_succeeded)
+        dlg.start_connection()
         dlg.exec()
 
     def launch_stream_for_profile(self, profile: DeviceProfile, endpoint: str, route_type: Optional[str] = None):
