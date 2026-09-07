@@ -170,7 +170,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.9.2")
+        lbl_ver = QLabel("v2.9.3")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -1287,6 +1287,10 @@ class DroidMasterApp(QMainWindow):
                         wifi_serial = d["serial"]
                         break
                 self.reload_devices(preferred_serial=wifi_serial)
+                if wifi_serial and self.active_profile:
+                    self.active_profile.lan_endpoint = wifi_serial
+                    device_manager.save_profile(self.active_profile)
+                    self.log(f"💾 Đã cập nhật địa chỉ Wi-Fi ({wifi_serial}) vào hồ sơ '{self.active_profile.name}'.")
                 QMessageBox.information(
                     self, "Kích Hoạt Wi-Fi Thành Công",
                     f"🎉 {msg_str}\n\n"

@@ -1,17 +1,17 @@
-# ⚡ DroidMaster Pro v2.9.2 — Universal Android Control Center (Animated 1-Click Connect & Tailscale Remote Onboarding)
+# ⚡ DroidMaster Pro v2.9.3 — Universal Android Control Center (Android 11+ Wireless mDNS & Responsive UX)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Danh bạ thiết bị thông minh (Smart Profiles) • Popup Animation Kết Nối Nhanh • Hướng dẫn Tailscale Remote Onboarding • Tự động kết nối lại khi đứt mạng • Kiến trúc v2.9.2</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Danh bạ thiết bị thông minh (Smart Profiles) • Auto-Discovery Gỡ Lỗi Không Dây Android 11+ (mDNS TLS) • Popup Animation Kết Nối Nhanh • Kiến trúc v2.9.3</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.9.2%20(Animated%20Connect)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.9.2" />
-  <img src="https://img.shields.io/badge/Tests-40%2F40%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 40/40 Passing" />
+  <img src="https://img.shields.io/badge/Version-v2.9.3%20(Wireless%20mDNS)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.9.3" />
+  <img src="https://img.shields.io/badge/Tests-41%2F41%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 41/41 Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
   <img src="https://img.shields.io/badge/Mirror-Scrcpy%204.1-FF6B6B?style=for-the-badge" alt="Scrcpy 4.1" />
@@ -22,9 +22,14 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.9.2 (Animated Connect & Tailscale Onboarding)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.9.3 (Wireless mDNS & Readable Error UX)
 
-Phiên bản **v2.9.2** tập trung tối ưu hóa chiều sâu trải nghiệm người dùng (UX) và giải quyết triệt để các phản hồi thực tế:
+Phiên bản **v2.9.3** giải quyết triệt để vấn đề gỡ lỗi không dây trên Android 11+ và hoàn thiện độ sắc nét của giao diện báo lỗi:
+
+* 📡 **Tự Động Nhận Diện Gỡ Lỗi Không Dây Android 11+ Qua mDNS (Auto-Discovery TLS):**
+  Trên các dòng Android mới (Android 11, 12, 13, 14), Google không mở cổng cố định 5555 mà phát sinh cổng động ngẫu nhiên (dynamic port). DroidMaster Pro tự động phân giải dịch vụ mạng `_adb-tls-connect._tcp` qua lệnh mDNS, khớp chính xác số serial phần cứng (`HA201ZLA`) và tự động kết nối vào cổng động hiện thời mà người dùng không cần dò tìm thủ công!
+* 🎨 **Khắc Phục Hoàn Toàn Lỗi Bị Ép Dẹp Khung Báo Lỗi (Error Layout Polish):**
+  Tự động ẩn hộp checklist giai đoạn khi phát sinh sự cố, giải phóng hoàn toàn không gian chiều dọc cho khung thông báo lỗi, tự động điều chỉnh độ cao cửa sổ linh hoạt để toàn bộ nguyên nhân và hướng dẫn xử lý hiển thị rõ ràng 100%, chống triệt để tình trạng chữ bị ép thành vạch ngang mỏng.
 
 * ⚡ **Popup Animation Kết Nối Nhanh (Animated 1-Click Connection Modal):**
   Khi bấm `⚡ KẾT NỐI NHANH (1-CLICK)`, ứng dụng lập tức mở hộp thoại tiến trình động (`Connecting... 15% -> 55% -> 85% -> 100%`) với:

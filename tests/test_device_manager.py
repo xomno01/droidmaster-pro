@@ -183,6 +183,29 @@ class TestDeviceManager(unittest.TestCase):
         self.assertEqual(route_type, "Tailscale")
         self.assertEqual(endpoint, "100.83.144.79:5555")
 
+    def test_resolve_best_route_mdns_discovery(self):
+        """When USB is unplugged and LAN endpoint not set, mDNS auto-discovery should resolve dynamic port."""
+        prof = DeviceProfile(
+            id="test_lenovo",
+            name="Tablet Lenovo",
+            usb_serial="HA201ZLA",
+            lan_endpoint="",
+            tailscale_endpoint="100.79.177.114:5555",
+            preferred_route="auto",
+        )
+        mock_services = [{
+            "name": "adb-HA201ZLA-WnQTEc",
+            "type": "_adb-tls-connect._tcp",
+            "endpoint": "192.168.0.230:45485",
+            "serial": "HA201ZLA"
+        }]
+        with patch("adb_core.discover_mdns_services", return_value=mock_services):
+            route_type, endpoint = self.manager.resolve_best_route(prof, connected_serials=[])
+        self.assertEqual(route_type, "Wi-Fi mDNS")
+        self.assertEqual(endpoint, "192.168.0.230:45485")
+        # Check that it auto-saved to profile.lan_endpoint
+        self.assertEqual(prof.lan_endpoint, "192.168.0.230:45485")
+
 
 class TestScrcpyLaunchWithProfileOptions(unittest.TestCase):
     """Test launch_scrcpy correctly appends profile flags (--no-audio, extra_args)."""

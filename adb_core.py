@@ -1171,6 +1171,30 @@ def verify_binary_manifest(manifest_path: Optional[str] = None) -> Dict[str, Any
     }
 
 
+def discover_mdns_services() -> List[Dict[str, str]]:
+    """Query active ADB mDNS services (e.g. Android 11+ Wireless Debugging).
+    Returns list of discovered services with parsed serial and endpoint:
+    [{'name': '...', 'type': '...', 'endpoint': '192.168.0.230:45485', 'serial': 'HA201ZLA'}]
+    """
+    code, out, err = run_adb_raw(["mdns", "services"])
+    services = []
+    if code != 0 or not out:
+        return services
+    for line in out.splitlines():
+        parts = line.strip().split()
+        if len(parts) >= 3 and parts[0] != "List":
+            svc_name, svc_type, endpoint = parts[0], parts[1], parts[2]
+            m = re.match(r"adb-([a-zA-Z0-9_-]+?)-[a-zA-Z0-9]+$", svc_name)
+            serial = m.group(1) if m else ""
+            services.append({
+                "name": svc_name,
+                "type": svc_type,
+                "endpoint": endpoint,
+                "serial": serial
+            })
+    return services
+
+
 __all__ = [
     "ADBError",
     "DeviceOfflineError",
@@ -1200,6 +1224,7 @@ __all__ = [
     "assign_process_to_job",
     "load_binary_manifest",
     "verify_binary_manifest",
+    "discover_mdns_services",
     "reboot",
     "BIN_DIR",
     "ADB_PATH",

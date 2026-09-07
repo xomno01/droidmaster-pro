@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
     QScrollArea,
+    QSizePolicy,
 )
 
 from device_manager import DeviceProfile, device_manager
@@ -313,23 +314,31 @@ class ConnectingProgressDialog(QDialog):
 
         # Error banner container (initially hidden)
         self.error_frame = QFrame()
+        self.error_frame.setObjectName("errorFrame")
+        self.error_frame.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.error_frame.setStyleSheet("""
-            background-color: rgba(239, 68, 68, 0.12);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            border-radius: 10px;
-            padding: 10px;
+            QFrame#errorFrame {
+                background-color: rgba(239, 68, 68, 0.12);
+                border: 1px solid rgba(239, 68, 68, 0.35);
+                border-radius: 12px;
+                padding: 10px;
+            }
         """)
         err_layout = QVBoxLayout(self.error_frame)
-        err_layout.setContentsMargins(10, 8, 10, 8)
-        err_layout.setSpacing(4)
+        err_layout.setContentsMargins(12, 10, 12, 10)
+        err_layout.setSpacing(6)
 
         self.lbl_err_title = QLabel("❌ Kết nối không thành công")
-        self.lbl_err_title.setStyleSheet("font-size: 13px; font-weight: 700; color: #fca5a5;")
+        self.lbl_err_title.setWordWrap(True)
+        self.lbl_err_title.setMinimumHeight(24)
+        self.lbl_err_title.setStyleSheet("font-size: 13.5px; font-weight: 700; color: #fca5a5;")
         err_layout.addWidget(self.lbl_err_title)
 
         self.lbl_err_detail = QLabel("Chi tiết lỗi...")
         self.lbl_err_detail.setWordWrap(True)
-        self.lbl_err_detail.setStyleSheet("font-size: 12px; color: #fecaca;")
+        self.lbl_err_detail.setMinimumHeight(70)
+        self.lbl_err_detail.setStyleSheet("font-size: 12px; color: #fecaca; line-height: 1.4;")
+        self.lbl_err_detail.setTextInteractionFlags(Qt.TextSelectableByMouse)
         err_layout.addWidget(self.lbl_err_detail)
 
         self.error_frame.setVisible(False)
@@ -445,6 +454,9 @@ class ConnectingProgressDialog(QDialog):
             }
         """)
 
+        # Hide step checklist so it doesn't take up vertical space and squash error message
+        self.step_box.setVisible(False)
+
         self.lbl_err_title.setText(f"❌ {title}")
         self.lbl_err_detail.setText(detail)
         self.error_frame.setVisible(True)
@@ -452,6 +464,10 @@ class ConnectingProgressDialog(QDialog):
         self.btn_retry.setVisible(can_retry)
         self.btn_manage_profiles.setVisible(True)
         self.btn_cancel.setText("Đóng")
+
+        # Dynamically resize dialog to fit error content cleanly
+        self.resize(self.width(), max(self.height(), 460))
+        self.adjustSize()
 
     def _animate_progress_tick(self):
         """Smoothly ticks progress towards target_progress."""
@@ -471,6 +487,8 @@ class ConnectingProgressDialog(QDialog):
 
         self.is_error = False
         self.error_frame.setVisible(False)
+        self.step_box.setVisible(True)
+        self.resize(550, 360)
         self.btn_retry.setVisible(False)
         self.btn_manage_profiles.setVisible(False)
         self.btn_cancel.setText("Hủy Bỏ")

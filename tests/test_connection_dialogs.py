@@ -84,7 +84,9 @@ class TestConnectionDialogs(unittest.TestCase):
         dlg.set_error("Không thể kết nối", "Timeout sau 5s", can_retry=True)
         self.assertTrue(dlg.is_error)
         self.assertEqual(dlg.lbl_icon.text(), "❌")
+        self.assertTrue(dlg.step_box.isHidden())
         self.assertFalse(dlg.error_frame.isHidden())
+        self.assertIn("Timeout", dlg.lbl_err_detail.text())
         self.assertFalse(dlg.btn_retry.isHidden())
 
         # Test retry click

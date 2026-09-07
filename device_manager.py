@@ -208,14 +208,36 @@ class DeviceManager:
         if profile.usb_serial and profile.usb_serial in connected:
             return "USB", profile.usb_serial
 
-        # Priority B: Check if LAN endpoint is online and responsive
+        # Priority B: Check if device is ALREADY connected via an active endpoint in ADB
+        if profile.lan_endpoint and profile.lan_endpoint in connected:
+            return "Wi-Fi LAN", profile.lan_endpoint
+
+        if profile.tailscale_endpoint and profile.tailscale_endpoint in connected:
+            return "Tailscale", profile.tailscale_endpoint
+
+        # Priority C: Check mDNS auto-discovery (Android 11+ Wireless Debugging with dynamic port)
+        if profile.usb_serial:
+            try:
+                import adb_core
+                services = adb_core.discover_mdns_services()
+                for s in services:
+                    if s.get("serial") == profile.usb_serial:
+                        endpoint = s.get("endpoint")
+                        if endpoint:
+                            profile.lan_endpoint = endpoint
+                            self.save_profile(profile)
+                            return "Wi-Fi mDNS", endpoint
+            except Exception:
+                pass
+
+        # Priority D: Check if LAN endpoint is online and responsive
         if profile.lan_endpoint:
             host = profile.lan_endpoint.split(":")[0]
             port = int(profile.lan_endpoint.split(":")[1]) if ":" in profile.lan_endpoint else 5555
             if is_socket_reachable(host, port, timeout=0.8):
                 return "LAN", profile.lan_endpoint
 
-        # Priority C: Check Tailscale endpoint
+        # Priority E: Check Tailscale endpoint
         if profile.tailscale_endpoint:
             return "Tailscale", profile.tailscale_endpoint
 
