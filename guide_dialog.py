@@ -396,6 +396,18 @@ GUIDE_HTML = """
     <p><b>Cách xử lý:</b> Bạn chưa bật mục <b>"Gỡ lỗi USB (Cài đặt bảo mật)"</b> và <b>"Cài đặt qua USB"</b> trong mục <i>Tùy chọn nhà phát triển</i> của Xiaomi. Hãy làm theo hướng dẫn chi tiết ở <b>Phần 2 - Mục 1</b> ở trên!</p>
 </div>
 
+<div class="card">
+    <h3>4. Vì sao khi đăng nhập Tailscale, mở tab ẩn danh hoặc app ngân hàng thì màn hình stream bị đen thui?</h3>
+    <p><b>Hiện tượng:</b> Màn hình điện thoại thật thì hiển thị bình thường trơn tru, nhưng cửa sổ stream trên máy tính lại đen thui (Black Screen).<br>
+    <b>Nguyên nhân:</b> Đây là cơ chế bảo mật cốt lõi cấp hệ thống của Android mang tên <code>FLAG_SECURE</code>. Khi một ứng dụng mở màn hình nhập mật khẩu, trang đăng nhập xác thực OAuth (như Tailscale Login, Google/Microsoft Sign-in), ứng dụng ngân hàng hoặc tab ẩn danh (Incognito), Android sẽ <b>cấm tuyệt đối việc chụp ảnh hoặc truyền tín hiệu video màn hình ra bên ngoài</b> để chống mã độc nhìn trộm mật khẩu và cookie xác thực.<br>
+    <b>Cách xử lý:</b></p>
+    <ul>
+        <li><b>Khi đăng nhập:</b> Cầm điện thoại lên và thao tác đăng nhập trực tiếp trên máy (chỉ mất vài giây và chỉ cần làm 1 lần). Vừa đăng nhập xong vào giao diện chính là màn hình stream trên máy tính lập tức sáng lại bình thường!</li>
+        <li><b>Nếu dùng Chrome:</b> Tránh dùng tab Ẩn danh (Incognito) để đăng nhập, hoặc gõ vào thanh địa chỉ <code>chrome://flags</code> tìm <i>Incognito Screenshot</i> đổi thành <i>Enabled</i> rồi khởi động lại Chrome.</li>
+        <li><b>Trên Xiaomi/POCO:</b> Vào Cài đặt ➔ Cài đặt bổ sung ➔ Bàn phím & Phương thức nhập ➔ Tắt <i>"Bàn phím bảo mật khi nhập mật khẩu"</i>.</li>
+    </ul>
+</div>
+
 <div style="text-align: center; margin-top: 40px; padding: 20px; color: #64748b; font-size: 12px; border-top: 1px solid #1e293b;">
     ⚡ DroidMaster Pro • Thiết kế & Phát triển chuẩn tương lai 2026 • Chúc bạn có trải nghiệm tuyệt vời!
 </div>
