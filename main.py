@@ -146,7 +146,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.8.5")
+        lbl_ver = QLabel("v2.8.6")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -401,7 +401,7 @@ class DroidMasterApp(QMainWindow):
         self.bento_grid.setHorizontalSpacing(14)
         self.bento_grid.setVerticalSpacing(14)
 
-        def create_bento_tile(icon, title, desc, btn_text, callback, accent_color="#38bdf8"):
+        def create_bento_tile(icon, title, desc, btn_text, callback, accent_color="#38bdf8", extra_widget=None):
             tile = QFrame()
             tile.setProperty("class", "bentoCard")
             tile.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -419,6 +419,9 @@ class DroidMasterApp(QMainWindow):
             t_title.setWordWrap(True)
             head_h.addWidget(icon_lbl)
             head_h.addWidget(t_title, 1)
+
+            if extra_widget:
+                head_h.addWidget(extra_widget)
 
             t_desc = QLabel(desc)
             t_desc.setObjectName("cardDesc")
@@ -448,10 +451,17 @@ class DroidMasterApp(QMainWindow):
             "Chọn file APK...", self.action_install_apk, "#10b981"
         )
 
+        btn_change_ip_toggle = QPushButton("⚙️ Đổi IP")
+        btn_change_ip_toggle.setObjectName("btnMiniToggle")
+        btn_change_ip_toggle.setCursor(QCursor(Qt.PointingHandCursor))
+        btn_change_ip_toggle.setToolTip("Đổi địa chỉ IP Wi-Fi mới hoặc nhập IP Tailscale (100.x.y.z)")
+        btn_change_ip_toggle.clicked.connect(self.prompt_change_ip)
+
         tile_wifi, _ = create_bento_tile(
             "📶", "Không Dây Wi-Fi",
-            "Kích hoạt kết nối qua Wi-Fi (cổng 5555) để rút dây cáp USB.",
-            "Bật kết nối Wi-Fi", self.action_connect_wifi, "#f59e0b"
+            "Kích hoạt kết nối qua Wi-Fi (cổng 5555) hoặc đổi IP Tailscale.",
+            "Bật kết nối Wi-Fi", self.action_connect_wifi, "#f59e0b",
+            extra_widget=btn_change_ip_toggle
         )
 
         tile_bot, self.btn_bot = create_bento_tile(
@@ -538,7 +548,7 @@ class DroidMasterApp(QMainWindow):
         root_layout.addWidget(self.scroll, 1)
 
         self.setCentralWidget(central)
-        self.log("🚀 DroidMaster Pro v2.8.5 sẵn sàng.")
+        self.log("🚀 DroidMaster Pro v2.8.6 sẵn sàng.")
 
     def eventFilter(self, watched, event):
         if hasattr(self, 'scroll') and watched == self.scroll.viewport():
@@ -923,54 +933,81 @@ class DroidMasterApp(QMainWindow):
 
         self.run_async(task, on_done)
 
+    def prompt_change_ip(self):
+        """Prompt user for a new Wi-Fi or Tailscale IP address and switch immediately."""
+        last_endpoint = adb_core.load_config().get("last_wifi_endpoint", "")
+        current_ip = ""
+        if self.active_serial and ":" in self.active_serial:
+            current_ip = self.active_serial.split(":")[0]
+        elif last_endpoint:
+            current_ip = last_endpoint.split(":")[0]
+        else:
+            current_ip = "192.168.0.106"
+
+        ip_val, ok = QInputDialog.getText(
+            self, "Đổi Địa Chỉ IP Wi-Fi / Tailscale",
+            "Nhập địa chỉ IP mới của điện thoại:\n"
+            "• Nếu đổi sang mạng Wi-Fi khác: Nhập IP Wi-Fi mới (ví dụ: 192.168.1.50)\n"
+            "• Nếu dùng qua mạng ngoài (Tailscale): Nhập IP Tailscale (ví dụ: 100.96.200.10)\n\n"
+            "Địa chỉ IP mới:",
+            text=current_ip
+        )
+        if not ok or not ip_val.strip():
+            return
+
+        target_ip = ip_val.strip()
+        endpoint_full = f"{target_ip}:5555" if ":" not in target_ip else target_ip
+
+        self.log(f"📶 Đang chuyển đổi sang địa chỉ IP mới ({endpoint_full})...")
+
+        old_serial = self.active_serial
+
+        def task():
+            # If previous active connection was Wi-Fi, disconnect it first
+            if old_serial and ":" in old_serial and old_serial != endpoint_full:
+                adb_core.disconnect_endpoint(old_serial)
+            return adb_core.connect_endpoint(target_ip, timeout=5)
+
+        def on_done(ok_conn, msg_conn):
+            if ok_conn:
+                self.log(f"✅ {msg_conn}")
+                adb_core.save_config("last_wifi_endpoint", endpoint_full)
+                self.reload_devices(preferred_serial=endpoint_full)
+                QMessageBox.information(
+                    self, "Đổi IP Thành Công",
+                    f"🎉 {msg_conn}\n\n"
+                    f"👉 Thiết bị đã được kết nối với địa chỉ mới: {endpoint_full}!\n"
+                    f"Bây giờ anh có thể bấm 'BẬT CHIẾU MÀN HÌNH' để sử dụng."
+                )
+            else:
+                self.log(f"❌ {msg_conn}")
+                QMessageBox.warning(
+                    self, "Không Thể Kết Nối Tới IP Mới",
+                    f"Không thể kết nối Wi-Fi tới {endpoint_full}.\n\n"
+                    f"• Chi tiết: {msg_conn}\n\n"
+                    f"👉 Hướng dẫn kiểm tra:\n"
+                    f"1. Nếu dùng Wi-Fi khác: Kiểm tra điện thoại và máy tính đã bắt chung mạng chưa.\n"
+                    f"2. Nếu dùng Tailscale: Đảm bảo ứng dụng Tailscale trên điện thoại đang Connected (bật VPN).\n"
+                    f"3. Nếu điện thoại vừa khởi động lại: Cần cắm cáp USB 1 lần để mở lại cổng 5555."
+                )
+
+        self.run_async(task, on_done)
+
     def action_connect_wifi(self):
         if not self.active_serial:
-            # Wireless mode without cable: Allow direct IP entry or reconnect to saved endpoint
-            last_endpoint = adb_core.load_config().get("last_wifi_endpoint", "192.168.0.106:5555")
-            default_ip = last_endpoint.split(":")[0] if last_endpoint else "192.168.0.106"
-            ip_val, ok = QInputDialog.getText(
-                self, "Kết Nối Không Dây Wi-Fi (Không Cần Cáp)",
-                "Hiện không có điện thoại cắm cáp USB.\n"
-                "Nhập địa chỉ IP Wi-Fi của điện thoại để kết nối trực tiếp:\n"
-                "(Lưu ý: Điện thoại và máy tính phải bắt chung mạng Wi-Fi)",
-                text=default_ip
-            )
-            if not ok or not ip_val.strip():
-                return
-            target_ip = ip_val.strip()
-            self.log(f"📶 Đang kết nối không dây trực tiếp tới {target_ip}:5555...")
-
-            def direct_task():
-                return adb_core.connect_endpoint(target_ip, timeout=5)
-
-            def on_direct_done(ok_dir, msg_dir):
-                if ok_dir:
-                    self.log(f"✅ {msg_dir}")
-                    endpoint_full = f"{target_ip}:5555" if ":" not in target_ip else target_ip
-                    adb_core.save_config("last_wifi_endpoint", endpoint_full)
-                    self.reload_devices(preferred_serial=endpoint_full)
-                    QMessageBox.information(
-                        self, "Kích Hoạt Wi-Fi Thành Công",
-                        f"🎉 {msg_dir}\n\n"
-                        f"👉 Thiết bị đã sẵn sàng điều khiển hoàn toàn không dây!\n"
-                        f"Bây giờ anh có thể bấm 'BẬT CHIẾU MÀN HÌNH' ngay."
-                    )
-                else:
-                    self.log(f"❌ {msg_dir}")
-                    QMessageBox.warning(
-                        self, "Không Thể Kết Nối Wi-Fi",
-                        f"Không thể kết nối Wi-Fi tới {target_ip}:5555.\n\n"
-                        f"• Chi tiết: {msg_dir}\n\n"
-                        f"👉 Nguyên nhân thường gặp:\n"
-                        f"1. Điện thoại vừa bị khởi động lại (Reboot) nên cổng 5555 bị đóng -> Cần cắm cáp USB 1 lần để mở lại.\n"
-                        f"2. Điện thoại và máy tính chưa bắt chung một mạng Wi-Fi."
-                    )
-
-            self.run_async(direct_task, on_direct_done)
+            self.prompt_change_ip()
             return
 
         if ":" in self.active_serial:
-            QMessageBox.information(self, "Đã kết nối Wi-Fi", f"Thiết bị đang kết nối qua Wi-Fi ({self.active_serial}) rồi!")
+            reply = QMessageBox.question(
+                self, "Đổi Địa Chỉ IP Wi-Fi",
+                f"Thiết bị hiện đang kết nối qua Wi-Fi:\n👉 {self.active_serial}\n\n"
+                "Anh có muốn đổi sang địa chỉ IP khác (mạng Wi-Fi mới hoặc IP Tailscale) không?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                self.prompt_change_ip()
             return
 
         # Check if this device already has an active Wi-Fi connection in devices list

@@ -222,6 +222,24 @@ QPushButton#btnUserGuide:hover {
     border-color: #a78bfa;
 }
 
+/* Mini Header Toggle Button (e.g. Change IP / Settings) */
+QPushButton#btnMiniToggle {
+    background-color: rgba(245, 158, 11, 0.16);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 6px;
+    color: #f59e0b;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    min-height: 22px;
+}
+
+QPushButton#btnMiniToggle:hover {
+    background-color: rgba(245, 158, 11, 0.32);
+    border-color: #fbbf24;
+    color: #ffffff;
+}
+
 /* Action Card Button (Modern Tile Button) */
 QPushButton#actionTileBtn {
     background-color: #162032;

@@ -772,6 +772,18 @@ def connect_endpoint(endpoint: str, timeout: int = 5, check: bool = False) -> Tu
     return False, err_msg
 
 
+def disconnect_endpoint(endpoint: str = None, timeout: int = 5) -> Tuple[bool, str]:
+    """Disconnect a TCP/IP endpoint. If endpoint is None, disconnects all."""
+    cmd = ["disconnect"]
+    if endpoint and endpoint.strip():
+        cmd.append(endpoint.strip())
+    code, out, err = run_adb_raw(cmd, timeout=timeout)
+    combined = (out or err).strip()
+    if code == 0 or "disconnected" in combined.lower():
+        return True, combined or f"Đã ngắt kết nối {endpoint or 'tất cả'}"
+    return False, combined or "Ngắt kết nối thất bại"
+
+
 def switch_to_wifi(serial: str, ip: str, port: int = 5555, check: bool = False) -> Tuple[bool, str]:
     """Enable TCP/IP wireless debugging and connect over Wi-Fi.
     Maintained for backward compatibility; delegates to connect_wifi.

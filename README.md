@@ -1,17 +1,17 @@
-# ⚡ DroidMaster Pro v2.8.5 — Universal Android Control Center (In-App HTML Guide & Dual-Screen Sync)
+# ⚡ DroidMaster Pro v2.8.6 — Universal Android Control Center (Quick IP / Tailscale Switcher & Auto-Reconnect)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Cẩm nang HTML gắn sẵn không mở browser • Đồng bộ song song 2 màn hình thời gian thực • Kiến trúc Enterprise v2.8.5</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Toggle đổi nhanh IP Wi-Fi/Tailscale tức thì • Cẩm nang HTML gắn sẵn không mở browser • Kiến trúc Enterprise v2.8.6</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.8.5%20(HTML%20Guide%20%26%20Sync)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.5" />
-  <img src="https://img.shields.io/badge/Tests-20%2F20%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 20/20 Passing" />
+  <img src="https://img.shields.io/badge/Version-v2.8.6%20(Quick%20IP%20Switcher)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.8.6" />
+  <img src="https://img.shields.io/badge/Tests-21%2F21%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 21/21 Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
   <img src="https://img.shields.io/badge/Mirror-Scrcpy%204.1-FF6B6B?style=for-the-badge" alt="Scrcpy 4.1" />
@@ -22,9 +22,18 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.5 (In-App HTML Guide & Dual-Screen Sync)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.8.6 (Quick IP / Tailscale Switcher)
 
-Phiên bản **v2.8.5** bổ sung cẩm nang hướng dẫn toàn diện tích hợp nguyên khối trong ứng dụng và tối ưu trải nghiệm đồng bộ hiển thị màn hình thực tế:
+Phiên bản **v2.8.6** bổ sung công cụ chuyển đổi nhanh địa chỉ IP Wi-Fi và mạng ngoài Tailscale linh hoạt:
+
+* ⚙️ **Nút Toggle "Đổi IP" Trực Tiếp Trên Thẻ Wi-Fi (Quick IP Switcher):**
+  Tích hợp nút nhỏ màu cam `⚙️ Đổi IP` ngay trên góc phải thẻ **"Không Dây Wi-Fi"**. Cho phép người dùng đổi sang dải mạng Wi-Fi mới hoặc nhập địa chỉ Tailscale VPN (`100.x.y.z`) bất kỳ lúc nào chỉ với 1 click.
+* 🔄 **Tự Động Ngắt Endpoint Cũ Khi Đổi IP (`adb disconnect`):**
+  Khi chuyển đổi IP, hệ thống tự động giải phóng endpoint Wi-Fi cũ qua `adb_core.disconnect_endpoint()`, triệt tiêu hoàn toàn tình trạng thiết bị cũ còn sót lại gây xung đột hoặc báo lỗi offline.
+* 💬 **Hộp Thoại Chuyển Đổi Thông Minh Thay Vì Chặn Báo Lỗi:**
+  Khi thiết bị đã kết nối Wi-Fi sẵn, nếu người dùng bấm nút "Bật kết nối Wi-Fi", ứng dụng không còn chặn bằng hộp thoại thông báo tĩnh mà lịch sự hỏi: *"Anh có muốn đổi sang địa chỉ IP khác (mạng Wi-Fi mới hoặc Tailscale) không?"*.
+* 🧪 **Bộ Kiểm Thử Mở Rộng Lên 21 Unit Tests (100% Pass):**
+  Bổ sung unit test `test_disconnect_endpoint` kiểm thử ngắt kết nối cho từng endpoint hoặc toàn bộ hệ thống.
 
 * 📖 **Cẩm Nang & Hướng Dẫn Sử Dụng Gắn Sẵn (In-App HTML Knowledge Base):**
   Tích hợp nguyên khối tài liệu hướng dẫn chuẩn giao diện Dark Obsidian vào bên trong ứng dụng PySide6 qua `QTextBrowser`, mở tức thì bằng 1-click nút `📖 HƯỚNG DẪN SỬ DỤNG` mà **hoàn toàn không cần mở trình duyệt web ngoài (Chrome/Edge)**.

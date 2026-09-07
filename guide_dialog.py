@@ -265,9 +265,16 @@ GUIDE_HTML = """
 <ol>
     <li>Cài ứng dụng <b>Tailscale</b> lên cả máy tính và điện thoại, đăng nhập cùng 1 tài khoản (hoàn toàn miễn phí).</li>
     <li>Lấy địa chỉ IP Tailscale của điện thoại (có dạng <code>100.x.y.z</code>).</li>
-    <li>Mở DroidMaster Pro ➔ Bấm <b>"Không Dây Wi-Fi"</b> ➔ Nhập địa chỉ <code>100.x.y.z:5555</code> ➔ Bấm OK.<br>
+    <li>Mở DroidMaster Pro ➔ Bấm nút nhỏ <b>"⚙️ Đổi IP"</b> trên thẻ Wi-Fi ➔ Nhập địa chỉ <code>100.x.y.z:5555</code> ➔ Bấm OK.<br>
     Bạn có thể điều khiển điện thoại ở nhà từ bất kỳ đâu trên thế giới!</li>
 </ol>
+
+<h3>3. Cách đổi nhanh địa chỉ IP (Khi đổi mạng Wi-Fi hoặc dùng Tailscale):</h3>
+<div class="alert-box-info">
+    <b>⚙️ NÚT TOGGLE "ĐỔI IP" TIỆN LỢI TRÊN THẺ WI-FI:</b><br>
+    Ngay trên tiêu đề thẻ <b>"Không Dây Wi-Fi"</b>, ứng dụng tích hợp sẵn nút nhỏ màu cam <code>⚙️ Đổi IP</code>.<br>
+    👉 Bấm nút này bất cứ lúc nào để nhập địa chỉ IP mới (khi đổi sang mạng Wi-Fi khác hoặc chuyển sang IP Tailscale <code>100.x.y.z</code>). Ứng dụng sẽ tự động ngắt IP cũ và kết nối sang IP mới tức thì mà không cần cắm lại cáp!
+</div>
 
 <!-- ======================================================================= -->
 <a name="sec_stream"></a>

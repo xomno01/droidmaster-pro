@@ -40,6 +40,7 @@ from adb_core import (
     connect_wifi,
     switch_to_wifi,
     connect_endpoint,
+    disconnect_endpoint,
     load_config,
     save_config,
     load_binary_manifest,
@@ -481,6 +482,19 @@ class TestADBCore(unittest.TestCase):
             ok, msg = connect_endpoint("192.168.0.50")
             self.assertFalse(ok)
             self.assertIn("cannot connect", msg)
+
+    def test_disconnect_endpoint(self):
+        """Test disconnect_endpoint for single endpoint or all."""
+        with patch("adb_core.run_adb_raw", return_value=(0, "disconnected 192.168.0.50:5555", "")) as mock_adb:
+            ok, msg = disconnect_endpoint("192.168.0.50:5555")
+            self.assertTrue(ok)
+            self.assertIn("disconnected", msg)
+            mock_adb.assert_called_with(["disconnect", "192.168.0.50:5555"], timeout=5)
+
+        with patch("adb_core.run_adb_raw", return_value=(0, "disconnected everything", "")) as mock_adb_all:
+            ok, msg = disconnect_endpoint()
+            self.assertTrue(ok)
+            mock_adb_all.assert_called_with(["disconnect"], timeout=5)
 
     def test_config_persistence(self):
         """Test load_config and save_config functionality."""
