@@ -9,6 +9,7 @@ from typing import Optional, List
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDialog,
+    QWidget,
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
@@ -23,6 +24,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QFormLayout,
     QGroupBox,
+    QScrollArea,
 )
 
 from device_manager import DeviceProfile, device_manager
@@ -37,8 +39,8 @@ class ProfileDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("📋 DroidMaster Pro — Quản Lý Danh Bạ Thiết Bị")
-        self.setMinimumSize(720, 560)
-        self.resize(760, 580)
+        self.setMinimumSize(660, 460)
+        self.resize(760, 600)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
 
         self.current_profile: Optional[DeviceProfile] = None
@@ -54,6 +56,13 @@ class ProfileDialog(QDialog):
                 color: #f8fafc;
                 font-family: 'Segoe UI', system-ui, sans-serif;
             }
+            QScrollArea {
+                border: none;
+                background: transparent;
+            }
+            QScrollArea > QWidget > QWidget {
+                background: transparent;
+            }
             QLabel {
                 color: #e2e8f0;
                 font-size: 13px;
@@ -62,13 +71,18 @@ class ProfileDialog(QDialog):
                 background-color: #161e2e;
                 border: 1px solid #334155;
                 border-radius: 8px;
-                padding: 6px 12px;
+                padding: 4px 12px;
                 color: #f8fafc;
                 font-size: 13px;
+                min-height: 38px;
             }
             QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
                 border: 1px solid #3b82f6;
                 background-color: #1e293b;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 28px;
             }
             QListWidget {
                 background-color: #111827;
@@ -172,8 +186,19 @@ class ProfileDialog(QDialog):
 
         body_layout.addLayout(left_v, 1)
 
-        # Right Column: Profile Edit Form
-        right_v = QVBoxLayout()
+        # Right Column: Profile Edit Form wrapped in smooth QScrollArea
+        right_scroll = QScrollArea()
+        right_scroll.setObjectName("profileScrollArea")
+        right_scroll.setWidgetResizable(True)
+        right_scroll.setFrameShape(QFrame.NoFrame)
+        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        right_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+
+        right_container = QWidget()
+        right_container.setStyleSheet("background: transparent;")
+        right_v = QVBoxLayout(right_container)
+        right_v.setContentsMargins(6, 4, 16, 6)
+        right_v.setSpacing(14)
 
         lbl_form_head = QLabel("THÔNG TIN CẤU HÌNH")
         lbl_form_head.setStyleSheet("font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1px;")
@@ -182,7 +207,10 @@ class ProfileDialog(QDialog):
         # Basic Info Group
         grp_basic = QGroupBox("Nhận Diện Thiết Bị")
         form_basic = QFormLayout(grp_basic)
-        form_basic.setSpacing(10)
+        form_basic.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        form_basic.setRowWrapPolicy(QFormLayout.DontWrapRows)
+        form_basic.setVerticalSpacing(12)
+        form_basic.setHorizontalSpacing(14)
 
         self.txt_name = QLineEdit()
         self.txt_name.setPlaceholderText("Ví dụ: 📱 POCO F1 (Tailscale)")
@@ -194,10 +222,11 @@ class ProfileDialog(QDialog):
 
         # USB Serial with quick-fetch button
         usb_layout = QHBoxLayout()
+        usb_layout.setSpacing(8)
         self.txt_usb = QLineEdit()
         self.txt_usb.setPlaceholderText("Serial khi cắm cáp (ví dụ: 9e29bf42)")
         self.btn_fetch_usb = QPushButton("Lấy từ máy đang cắm")
-        self.btn_fetch_usb.setStyleSheet("background: #1e293b; color: #38bdf8; border: 1px solid #334155; font-size: 11px; padding: 6px 10px;")
+        self.btn_fetch_usb.setStyleSheet("background: #1e293b; color: #38bdf8; border: 1px solid #334155; font-size: 11px; padding: 6px 12px; min-height: 38px; border-radius: 8px;")
         self.btn_fetch_usb.clicked.connect(self.on_fetch_usb_serial)
         usb_layout.addWidget(self.txt_usb)
         usb_layout.addWidget(self.btn_fetch_usb)
@@ -208,7 +237,10 @@ class ProfileDialog(QDialog):
         # Network Routes Group
         grp_net = QGroupBox("Đường Truyền & Địa Chỉ Mạng")
         form_net = QFormLayout(grp_net)
-        form_net.setSpacing(10)
+        form_net.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        form_net.setRowWrapPolicy(QFormLayout.DontWrapRows)
+        form_net.setVerticalSpacing(12)
+        form_net.setHorizontalSpacing(14)
 
         self.txt_tailscale = QLineEdit()
         self.txt_tailscale.setPlaceholderText("Ví dụ: 100.83.144.79:5555")
@@ -230,7 +262,7 @@ class ProfileDialog(QDialog):
         # Scrcpy & Resilience Group
         grp_opts = QGroupBox("Tùy Chọn Khắc Phục Lỗi & Chiếu Màn Hình")
         v_opts = QVBoxLayout(grp_opts)
-        v_opts.setSpacing(8)
+        v_opts.setSpacing(10)
 
         self.chk_no_audio = QCheckBox("🔇 Tắt âm thanh (--no-audio) — Khuyên dùng cho Android 10 (POCO F1)")
         v_opts.addWidget(self.chk_no_audio)
@@ -244,6 +276,7 @@ class ProfileDialog(QDialog):
         self.spin_retries = QSpinBox()
         self.spin_retries.setRange(1, 10)
         self.spin_retries.setValue(3)
+        self.spin_retries.setFixedWidth(70)
         rec_layout.addWidget(lbl_rec)
         rec_layout.addWidget(self.spin_retries)
         rec_layout.addStretch()
@@ -254,12 +287,13 @@ class ProfileDialog(QDialog):
         # Action Buttons on Right
         btn_layout = QHBoxLayout()
         self.btn_save = QPushButton("💾 Lưu Hồ Sơ Thiết Bị")
-        self.btn_save.setStyleSheet("background-color: #10b981; color: #ffffff; font-size: 14px; min-height: 38px;")
+        self.btn_save.setStyleSheet("background-color: #10b981; color: #ffffff; font-size: 14px; min-height: 42px; font-weight: 700; border-radius: 8px;")
         self.btn_save.clicked.connect(self.on_click_save)
         btn_layout.addWidget(self.btn_save)
 
         right_v.addLayout(btn_layout)
-        body_layout.addLayout(right_v, 2)
+        right_scroll.setWidget(right_container)
+        body_layout.addWidget(right_scroll, 2)
 
         main_layout.addLayout(body_layout)
 

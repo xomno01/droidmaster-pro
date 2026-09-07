@@ -306,8 +306,9 @@ QLineEdit {
     color: #f8fafc;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
-    padding: 10px 14px;
+    padding: 8px 14px;
     font-size: 13px;
+    min-height: 38px;
 }
 
 QLineEdit:focus {
@@ -321,9 +322,10 @@ QComboBox {
     color: #f8fafc;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
-    padding: 8px 14px;
+    padding: 6px 14px;
     font-weight: 600;
     font-size: 12px;
+    min-height: 38px;
 }
 
 QComboBox:hover {
