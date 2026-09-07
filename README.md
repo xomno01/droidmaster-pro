@@ -1,17 +1,17 @@
-# ⚡ DroidMaster Pro v2.9.0 — Universal Android Control Center (Smart Profiles, 1-Click Remote & Auto-Reconnect)
+# ⚡ DroidMaster Pro v2.9.2 — Universal Android Control Center (Animated 1-Click Connect & Tailscale Remote Onboarding)
 
 <p align="center">
   <img src="app_icon.ico" width="100" height="100" alt="DroidMaster Pro Logo" />
   <br>
   <strong>Modern, Ultra-Lightweight Android Control & 60FPS Hardware Screen Mirroring Hub</strong>
   <br>
-  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Danh bạ thiết bị thông minh (Smart Profiles) • Kết nối 1-Click tự động phân giải lộ trình • Tự động kết nối lại khi đứt mạng • Kiến trúc v2.9.0</em>
+  <em>Tối ưu hóa phần cứng • Độ trễ thấp tiêu chuẩn 35-70ms qua Scrcpy pipeline • Danh bạ thiết bị thông minh (Smart Profiles) • Popup Animation Kết Nối Nhanh • Hướng dẫn Tailscale Remote Onboarding • Tự động kết nối lại khi đứt mạng • Kiến trúc v2.9.2</em>
 </p>
 
 <p align="center">
   <a href=".github/workflows/ci.yml"><img src="https://github.com/xomno01/droidmaster-pro/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline" /></a>
-  <img src="https://img.shields.io/badge/Version-v2.9.0%20(Smart%20Profiles)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.9.0" />
-  <img src="https://img.shields.io/badge/Tests-32%2F32%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 32/32 Passing" />
+  <img src="https://img.shields.io/badge/Version-v2.9.2%20(Animated%20Connect)-7928CA?style=for-the-badge&logo=android&logoColor=white" alt="Version v2.9.2" />
+  <img src="https://img.shields.io/badge/Tests-40%2F40%20Passing-brightgreen?style=for-the-badge&logo=pytest&logoColor=white" alt="Tests 40/40 Passing" />
   <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+" />
   <img src="https://img.shields.io/badge/GUI-PySide6%206.5+-41CD52?style=for-the-badge&logo=qt&logoColor=white" alt="PySide6 GUI" />
   <img src="https://img.shields.io/badge/Mirror-Scrcpy%204.1-FF6B6B?style=for-the-badge" alt="Scrcpy 4.1" />
@@ -22,20 +22,30 @@
 
 ---
 
-## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.9.0 (Smart Profiles & Resilient Auto-Reconnect)
+## 🛡️ Cải Tiến Kỹ Thuật & Tính Năng Nổi Bật v2.9.2 (Animated Connect & Tailscale Onboarding)
 
-Phiên bản **v2.9.0** mang đến bước nhảy vọt về trải nghiệm người dùng với mô hình quản trị thiết bị đa điểm:
+Phiên bản **v2.9.2** tập trung tối ưu hóa chiều sâu trải nghiệm người dùng (UX) và giải quyết triệt để các phản hồi thực tế:
 
+* ⚡ **Popup Animation Kết Nối Nhanh (Animated 1-Click Connection Modal):**
+  Khi bấm `⚡ KẾT NỐI NHANH (1-CLICK)`, ứng dụng lập tức mở hộp thoại tiến trình động (`Connecting... 15% -> 55% -> 85% -> 100%`) với:
+  - Tên thiết bị và huy hiệu lộ trình kết nối đầy đủ (`[Tailscale VPN Từ Xa] -> 100.83.144.79:5555` hoặc `[Cáp USB]`).
+  - Thanh tiến trình chuyển màu Gradient Emerald $\rightarrow$ Cyan $\rightarrow$ Blue mượt mà với bộ đếm phần trăm thời gian thực.
+  - Timeline 3 bước trực quan: *1. Phân giải lộ trình tối ưu $\rightarrow$ 2. Bắt tay & xác thực cổng ADB $\rightarrow$ 3. Khởi tạo đường truyền Scrcpy 60FPS*.
+  - Tự động đóng sau khi hoàn tất 100% để mở cửa sổ màn hình, hoặc hiển thị khung lỗi chi tiết kèm nút *Thử lại*, *Mở danh bạ*, và nút *Hủy bỏ*.
+* 🌐 **Popup Hướng Dẫn Tailscale Remote Onboarding (Không Cần Cáp USB):**
+  Khi kết nối bằng dây cáp USB và mở stream thành công, DroidMaster Pro tự động hiển thị thẻ hướng dẫn trực quan 3 bước:
+  - 1️⃣ Cài đặt app Tailscale trên Android.
+  - 2️⃣ Đăng nhập cùng tài khoản Tailscale với máy tính để tạo mạng riêng ảo VPN mesh an toàn.
+  - 3️⃣ Lưu địa chỉ IP Tailscale vào Danh bạ thiết bị để lần sau đi du lịch, đi làm đều có thể điều khiển từ xa không dây.
+  - Kèm tùy chọn *"Không hiển thị lại hướng dẫn này trên thiết bị này"* (lưu bền vững trong `config.json`) và nút bấm mở thẳng Profile để dán IP ngay.
 * 📋 **Danh Bạ Thiết Bị Thông Minh (Smart Device Profiles):**
   Lưu trữ hồ sơ thiết bị vào file JSON cục bộ bảo mật (`profiles.json`). Mỗi thiết bị lưu kèm: Tên gợi nhớ, Mã hiệu máy, Serial cáp USB, IP mạng Wi-Fi LAN và IP Tailscale VPN, cùng cờ Scrcpy riêng biệt. Tích hợp sẵn cấu hình mẫu cho POCO F1 điều khiển từ xa.
-* ⚡ **Kết Nối 1-Click (1-Click Smart Connection):**
-  Người dùng chỉ cần chọn máy từ danh bạ và bấm `⚡ KẾT NỐI NHANH (1-CLICK)`. DroidMaster Pro tự động phân giải lộ trình tối ưu: **Kiểm tra cáp USB $\rightarrow$ Ping thử IP LAN $\rightarrow$ Kết nối qua IP Tailscale VPN**, kết nối ADB và kích hoạt màn hình chiếu ngay tức khắc mà không cần nhớ hay gõ bất kỳ địa chỉ IP nào.
 * 🔄 **Tự Động Kết Nối Lại Khi Đứt Mạng (Silent Auto-Reconnect Engine):**
   Khi luồng stream bị ngắt đột ngột do mạng 4G/Wi-Fi chập chờn, hệ thống tự động nhận diện và kích hoạt chu trình thử lại (tối đa 3 lần với cơ chế exponential pause), xác thực lại daemon ADB và khởi động lại Scrcpy trong im lặng mà người dùng không cần bấm lại nút.
 * 🔇 **Tối Ưu Riêng Biệt Từng Dòng Máy (Device-Specific Flags):**
   Hỗ trợ lưu cấu hình riêng cho từng model, điển hình là cờ `--no-audio` tự động cho Android 10 (POCO F1) giúp khắc phục triệt để lỗi không khởi chạy được âm thanh hoặc giật hình.
-* 🧪 **Bộ Kiểm Thử Mở Rộng Đạt 32 Unit Tests (100% Pass):**
-  Bổ sung trọn vẹn test suite `tests/test_device_manager.py` bao quát mô hình dữ liệu, cơ chế lưu trữ JSON, ma trận phân giải lộ trình, tùy chọn khởi chạy Scrcpy và vòng đời giao diện Modal Dialog.
+* 🧪 **Bộ Kiểm Thử Mở Rộng Đạt 40 Unit Tests (100% Pass):**
+  Bộ unit test bao quát trọn vẹn mô hình dữ liệu, ma trận phân giải lộ trình, vòng đời của cả 2 Modal Dialogs (`tests/test_connection_dialogs.py`), kiểm tra trạng thái tiến trình, hủy bỏ, thử lại và lưu trữ cấu hình.
 
 * 📖 **Cẩm Nang & Hướng Dẫn Sử Dụng Gắn Sẵn (In-App HTML Knowledge Base):**
   Tích hợp nguyên khối tài liệu hướng dẫn chuẩn giao diện Dark Obsidian vào bên trong ứng dụng PySide6 qua `QTextBrowser`, mở tức thì bằng 1-click nút `📖 HƯỚNG DẪN SỬ DỤNG` mà **hoàn toàn không cần mở trình duyệt web ngoài (Chrome/Edge)**.

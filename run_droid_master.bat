@@ -5,7 +5,7 @@ cd /d "%~dp0"
 title DroidMaster Pro Launcher
 
 echo =====================================================================
-echo                 ⚡ DroidMaster Pro v2.9.0 Launcher
+echo                 ⚡ DroidMaster Pro v2.9.2 Launcher
 echo =====================================================================
 
 set "PYTHON_EXE="

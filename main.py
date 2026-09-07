@@ -25,6 +25,7 @@ from styles import DARK_THEME_QSS
 from guide_dialog import UserGuideDialog
 from device_manager import DeviceProfile, device_manager
 from profile_dialog import ProfileDialog
+from connection_dialogs import ConnectingProgressDialog, TailscaleOnboardingDialog, should_show_tailscale_hint
 
 # Global unhandled exception hook to prevent Qt6 qFatal aborts (0xc0000409)
 def global_excepthook(exctype, value, tb):
@@ -168,7 +169,7 @@ class DroidMasterApp(QMainWindow):
         lbl_logo.setStyleSheet("font-size: 22px;")
         lbl_brand = QLabel("DroidMaster Pro")
         lbl_brand.setObjectName("brandTitle")
-        lbl_ver = QLabel("v2.9.0")
+        lbl_ver = QLabel("v2.9.2")
         lbl_ver.setObjectName("metricPill")
 
         brand_row.addWidget(lbl_logo)
@@ -849,7 +850,7 @@ class DroidMasterApp(QMainWindow):
         dlg.exec()
 
     def action_one_click_connect(self):
-        """1-Click Smart Connection: Resolves optimal route, connects ADB, and starts stream."""
+        """1-Click Smart Connection: Resolves optimal route, connects ADB, and starts stream with animated progress dialog."""
         p_id = self.combo_profiles.currentData()
         profile = device_manager.get_profile(p_id) if p_id else None
         if not profile:
@@ -858,46 +859,96 @@ class DroidMasterApp(QMainWindow):
             return
 
         self.active_profile = profile
-        self.log(f"⚡ [1-CLICK] Đang phân giải lộ trình tối ưu cho '{profile.name}'...")
+        self.log(f"⚡ [1-CLICK] Bắt đầu kết nối nhanh cho '{profile.name}'...")
 
-        # 1. Resolve optimal route
-        connected = [d["serial"] for d in adb_core.list_devices() if d.get("state") == "device"]
-        route_type, target = device_manager.resolve_best_route(profile, connected_serials=connected)
+        # Create animated progress modal dialog
+        dlg = ConnectingProgressDialog(self, profile=profile)
+        dlg.open_profiles_requested.connect(self.open_profile_manager)
 
-        if not target:
-            self.log(f"❌ Không tìm thấy địa chỉ hợp lệ cho '{profile.name}'. Vui lòng mở Quản lý danh bạ để cài đặt IP.")
-            self.open_profile_manager()
-            return
+        is_cancelled = False
 
-        self.log(f"🌐 Lộ trình được chọn: [{route_type}] -> {target}")
+        def on_cancel():
+            nonlocal is_cancelled
+            is_cancelled = True
+            self.log(f"⚠️ Đã hủy kết nối tới '{profile.name}'.")
 
-        def connect_task():
+        dlg.cancelled.connect(on_cancel)
+
+        def run_connection_pipeline():
+            nonlocal is_cancelled
+            if is_cancelled:
+                return
+
+            # Step 1: Resolve best route
+            QTimer.singleShot(0, lambda: dlg.update_stage(1, 20))
+            time.sleep(0.25)
+            if is_cancelled:
+                return
+
+            connected = [d["serial"] for d in adb_core.list_devices() if d.get("state") == "device"]
+            route_type, target = device_manager.resolve_best_route(profile, connected_serials=connected)
+
+            if not target or is_cancelled:
+                def on_no_route():
+                    dlg.set_error(
+                        "Không tìm thấy địa chỉ kết nối",
+                        f"Không tìm thấy IP hoặc cáp USB cho '{profile.name}'.\n"
+                        "Vui lòng cắm cáp USB hoặc mở Quản lý danh bạ để kiểm tra IP Tailscale/Wi-Fi."
+                    )
+                QTimer.singleShot(0, on_no_route)
+                return
+
+            # Display route info on dialog
+            QTimer.singleShot(0, lambda: (
+                dlg.set_route_info(route_type, target),
+                dlg.update_stage(2, 55)
+            ))
+            self.log(f"🌐 Lộ trình kết nối: [{route_type}] -> {target}")
+
+            # Step 2: Connect ADB
             if ":" in target:
-                ok, msg = adb_core.connect_endpoint(target, timeout=4)
-                return ok, msg, target
-            return True, "Thiết bị USB sẵn sàng", target
+                ok, msg = adb_core.connect_endpoint(target, timeout=5)
+            else:
+                ok, msg = True, "Thiết bị USB sẵn sàng"
 
-        def on_connected(success, result):
-            if not success:
-                self.log(f"❌ Kết nối thất bại: {result}")
-                QMessageBox.warning(self, "Kết nối thất bại", f"Không thể kết nối tới {profile.name} qua {target}.\nChi tiết: {result}")
+            if is_cancelled:
                 return
 
-            ok, msg, endpoint = result
             if not ok:
-                self.log(f"❌ {msg}")
-                QMessageBox.warning(self, "Lỗi kết nối", f"Không thể kết nối ADB tới {endpoint}.\nVui lòng kiểm tra xem điện thoại có đang mở Wi-Fi/Tailscale không!")
+                def on_connect_failed():
+                    dlg.set_error(
+                        f"Không thể kết nối ADB tới {target}",
+                        f"Lỗi: {msg}\n"
+                        "💡 Mẹo: Hãy kiểm tra điện thoại có đang bật Tailscale/Wi-Fi và màn hình đã mở khóa chưa."
+                    )
+                QTimer.singleShot(0, on_connect_failed)
                 return
 
-            self.log(f"✅ {msg}")
-            self.reload_devices(preferred_serial=endpoint)
+            # Step 3: Launch Scrcpy stream
+            QTimer.singleShot(0, lambda: (
+                dlg.update_stage(3, 85),
+                self.reload_devices(preferred_serial=target)
+            ))
+            time.sleep(0.3)
+            if is_cancelled:
+                return
 
-            # 2. Launch stream with profile specific flags
-            self.launch_stream_for_profile(profile, endpoint)
+            # Finalize on main thread
+            def on_finalize():
+                if is_cancelled:
+                    return
+                dlg.set_success("Kết nối thành công! Đang mở màn hình...")
+                self.launch_stream_for_profile(profile, target, route_type=route_type)
 
-        self.run_async(connect_task, on_connected)
+            QTimer.singleShot(0, on_finalize)
 
-    def launch_stream_for_profile(self, profile: DeviceProfile, endpoint: str):
+        dlg.retry_requested.connect(lambda: threading.Thread(target=run_connection_pipeline, daemon=True).start())
+
+        # Start thread and open modal dialog
+        threading.Thread(target=run_connection_pipeline, daemon=True).start()
+        dlg.exec()
+
+    def launch_stream_for_profile(self, profile: DeviceProfile, endpoint: str, route_type: Optional[str] = None):
         """Launch Scrcpy stream with customized profile flags."""
         self.is_stream_manually_stopped = False
         self.reconnect_attempts = 0
@@ -930,8 +981,19 @@ class DroidMasterApp(QMainWindow):
 
             if not opts.get("turn_screen_off", False):
                 self.run_async(lambda: adb_core.send_keyevent(endpoint, "224"), lambda ok, res: None)
+
+            # Check if USB connection and should show Tailscale remote onboarding hint
+            if should_show_tailscale_hint(endpoint, profile):
+                QTimer.singleShot(800, lambda: self.show_tailscale_onboarding_hint(endpoint, profile))
         else:
             self.log(f"⚠️ Không thể khởi chạy Scrcpy cho {endpoint}")
+
+    def show_tailscale_onboarding_hint(self, endpoint: str, profile: Optional[DeviceProfile] = None):
+        """Show smart onboarding dialog teaching the user to use Tailscale for wireless remote access."""
+        dev_name = profile.name if profile else self.lbl_device_model.text()
+        dlg = TailscaleOnboardingDialog(self, device_name=dev_name, device_serial=endpoint)
+        dlg.open_profiles_requested.connect(self.open_profile_manager)
+        dlg.exec()
 
     def action_toggle_stream(self):
         try:
@@ -1009,6 +1071,10 @@ class DroidMasterApp(QMainWindow):
                             if opts.get("stay_awake", True):
                                 adb_core.run_adb_raw(["shell", "svc", "power", "stayon", "true"], serial=target_ser)
                         self.run_async(wake_task, lambda ok, res: None)
+
+                    # If USB cable connection and Tailscale hint not dismissed, display onboarding popup
+                    if should_show_tailscale_hint(self.active_serial, self.active_profile):
+                        QTimer.singleShot(800, lambda: self.show_tailscale_onboarding_hint(self.active_serial, self.active_profile))
                 else:
                     QMessageBox.critical(self, "Lỗi", "Không thể bật Scrcpy. Hãy kiểm tra kết nối thiết bị!")
         except Exception as e:
