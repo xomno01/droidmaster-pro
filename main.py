@@ -309,29 +309,34 @@ class DroidMasterApp(QMainWindow):
 
         nav_dock = QFrame()
         nav_dock.setObjectName("navDock")
-        nav_dock_layout = QHBoxLayout(nav_dock)
+        nav_dock_layout = QGridLayout(nav_dock)
         nav_dock_layout.setContentsMargins(4, 4, 4, 4)
-        nav_dock_layout.setSpacing(4)
+        nav_dock_layout.setHorizontalSpacing(6)
+        nav_dock_layout.setVerticalSpacing(6)
 
         buttons_data = [
-            ("◀", "Quay lại (Back)", lambda: self.send_key("4")),
-            ("●", "Trang chính (Home)", lambda: self.send_key("3")),
-            ("■", "Đa nhiệm (Recents)", lambda: self.send_key("187")),
-            ("🔓", "Mở khóa màn hình (Nhập mã PIN)", self.action_unlock_pin),
-            ("🔔", "Hạ thanh thông báo", self.action_pull_notifications),
-            ("💡", "Bật sáng màn hình máy (Wake Up)", self.action_wake_screen),
-            ("🔒", "Khóa / Mở nguồn (Power)", lambda: self.send_key("26")),
-            ("🔉", "Giảm âm", lambda: self.send_key("25")),
-            ("🔊", "Tăng âm", lambda: self.send_key("24")),
+            # Row 0: Navigation & Unlock
+            (0, 0, "◀", "Quay lại (Back)", lambda: self.send_key("4")),
+            (0, 1, "●", "Trang chính (Home)", lambda: self.send_key("3")),
+            (0, 2, "■", "Đa nhiệm (Recents)", lambda: self.send_key("187")),
+            (0, 3, "🔓", "Mở khóa màn hình (Nhập PIN)", self.action_unlock_pin),
+            (0, 4, "🔔", "Hạ thanh thông báo", self.action_pull_notifications),
+            # Row 1: Hardware controls & Quick actions
+            (1, 0, "💡", "Bật sáng màn hình máy (Wake Up)", self.action_wake_screen),
+            (1, 1, "🔒", "Khóa / Mở nguồn (Power)", lambda: self.send_key("26")),
+            (1, 2, "🔉", "Giảm âm lượng (Vol -)", lambda: self.send_key("25")),
+            (1, 3, "🔊", "Tăng âm lượng (Vol +)", lambda: self.send_key("24")),
+            (1, 4, "📸", "Chụp nhanh màn hình", self.action_take_screenshot),
         ]
 
-        for icon, tooltip, callback in buttons_data:
+        for r, c, icon, tooltip, callback in buttons_data:
             btn = QPushButton(icon)
             btn.setProperty("class", "navBtn")
             btn.setToolTip(tooltip)
             btn.setCursor(QCursor(Qt.PointingHandCursor))
+            btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             btn.clicked.connect(callback)
-            nav_dock_layout.addWidget(btn)
+            nav_dock_layout.addWidget(btn, r, c)
 
         side_layout.addWidget(nav_dock)
 

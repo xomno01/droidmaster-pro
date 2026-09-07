@@ -240,6 +240,35 @@ QPushButton#btnMiniToggle:hover {
     color: #ffffff;
 }
 
+/* Remote Navigation Dock & Buttons */
+QFrame#navDock {
+    background-color: #111827;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 6px;
+}
+
+QPushButton.navBtn {
+    background-color: #1e293b;
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0px;
+    min-height: 36px;
+    font-size: 16px;
+}
+
+QPushButton.navBtn:hover {
+    background-color: #334155;
+    border-color: #38bdf8;
+    color: #ffffff;
+}
+
+QPushButton.navBtn:pressed {
+    background-color: #0f172a;
+    border-color: #0284c7;
+}
+
 /* Action Card Button (Modern Tile Button) */
 QPushButton#actionTileBtn {
     background-color: #162032;
