@@ -317,6 +317,7 @@ class DroidMasterApp(QMainWindow):
             ("◀", "Quay lại (Back)", lambda: self.send_key("4")),
             ("●", "Trang chính (Home)", lambda: self.send_key("3")),
             ("■", "Đa nhiệm (Recents)", lambda: self.send_key("187")),
+            ("🔓", "Mở khóa màn hình (Nhập mã PIN)", self.action_unlock_pin),
             ("🔔", "Hạ thanh thông báo", self.action_pull_notifications),
             ("💡", "Bật sáng màn hình máy (Wake Up)", self.action_wake_screen),
             ("🔒", "Khóa / Mở nguồn (Power)", lambda: self.send_key("26")),
@@ -435,8 +436,12 @@ class DroidMasterApp(QMainWindow):
         hero_layout.addLayout(toggles_grid)
 
         # Screen Sync Tip Banner
-        lbl_screen_tip = QLabel("💡 Mẹo: Muốn điện thoại và máy tính cùng sáng song song, hãy BỎ TÍCH 'Tắt màn hình máy'. Phím tắt: Alt+Shift+O để bật lại màn hình điện thoại bất kỳ lúc nào.")
-        lbl_screen_tip.setStyleSheet("font-size: 11px; color: #38bdf8; line-height: 1.3;")
+        lbl_screen_tip = QLabel(
+            "💡 Mẹo:\n"
+            "• Muốn máy tính và tablet cùng sáng song song, hãy BỎ TÍCH 'Tắt màn hình máy'.\n"
+            "• Khi ở màn hình khóa PIN, cửa sổ stream sẽ đen do bảo mật FLAG_SECURE của Android 15. Anh chỉ cần click vào cửa sổ stream gõ PIN + Enter, hoặc bấm nút '🔓' trên thanh điều khiển bên trái để mở khóa!"
+        )
+        lbl_screen_tip.setStyleSheet("font-size: 11px; color: #38bdf8; line-height: 1.35;")
         lbl_screen_tip.setWordWrap(True)
         hero_layout.addWidget(lbl_screen_tip)
 
@@ -1076,6 +1081,46 @@ class DroidMasterApp(QMainWindow):
             adb_core.send_keyevent(target_ser, "82")   # KEYCODE_MENU (unlock)
         threading.Thread(target=task, daemon=True).start()
         self.log("💡 Đã gửi tín hiệu đánh thức màn hình điện thoại (Wake Up).")
+
+    def action_unlock_pin(self):
+        """Prompt user for PIN and unlock device via ADB (bypassing Android 15 FLAG_SECURE black screen)."""
+        if not self.active_serial:
+            self.log("⚠️ Vui lòng chọn thiết bị trước khi mở khóa!")
+            return
+
+        pin, ok = QInputDialog.getText(
+            self, "🔓 Mở Khóa Màn Hình (Nhập PIN)",
+            "Nhập mã PIN hoặc mật khẩu mở khóa màn hình:\n\n"
+            "💡 Lưu ý: Trên Android 12-15, màn hình nhập mã PIN được bảo vệ bởi tính năng\n"
+            "FLAG_SECURE của hệ điều hành nên cửa sổ stream sẽ tạm thời có màu đen.\n"
+            "Nhập mã PIN tại đây để mở khóa ngay lập tức và đưa màn hình sáng trở lại!\n\n"
+            "Mã PIN:",
+            QLineEdit.Password
+        )
+        if not ok or not pin.strip():
+            return
+
+        target_ser = self.active_serial
+        pin_clean = pin.strip()
+
+        def task():
+            # 1. Wake up screen
+            adb_core.send_keyevent(target_ser, "224")  # KEYCODE_WAKEUP
+            time.sleep(0.1)
+            # 2. Trigger unlock prompt
+            adb_core.send_keyevent(target_ser, "82")   # KEYCODE_MENU
+            time.sleep(0.15)
+            # 3. Dismiss keyguard
+            adb_core.run_adb_raw(["shell", "wm", "dismiss-keyguard"], serial=target_ser)
+            time.sleep(0.1)
+            # 4. Inject PIN digits
+            adb_core.run_adb_raw(["shell", "input", "text", pin_clean], serial=target_ser)
+            time.sleep(0.1)
+            # 5. Send Enter key
+            adb_core.send_keyevent(target_ser, "66")   # KEYCODE_ENTER
+
+        threading.Thread(target=task, daemon=True).start()
+        self.log(f"🔓 Đã gửi mã PIN mở khóa màn hình cho {target_ser}.")
 
     def open_user_guide(self):
         if not hasattr(self, "_guide_dialog") or self._guide_dialog is None:
